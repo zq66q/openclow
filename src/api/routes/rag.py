@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
-import time
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
@@ -55,7 +53,7 @@ async def rag_ingest(req: RAGIngestRequest) -> dict[str, Any]:
             "source": result.get("source", req.source),
         }
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # ── 文件上传入库 ──
@@ -63,8 +61,8 @@ async def rag_ingest(req: RAGIngestRequest) -> dict[str, Any]:
 
 @router.post("/upload", response_model=RAGIngestResponse)
 async def rag_upload(
-    file: UploadFile = File(..., description="要上传的文档 (PDF/DOCX/PPTX/TXT/MD/CSV/JSON/HTML)"),
-    source: str = Form(default="", description="来源标识（留空则使用文件名）"),
+    file: Annotated[UploadFile, File(..., description="要上传的文档 (PDF/DOCX/PPTX/TXT/MD/CSV/JSON/HTML)")],
+    source: Annotated[str, Form(description="来源标识（留空则使用文件名）")] = "",
 ) -> dict[str, Any]:
     """上传文档文件到知识库。
 
@@ -106,7 +104,7 @@ async def rag_upload(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Ingest failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Ingest failed: {exc}") from exc
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
@@ -144,7 +142,7 @@ async def rag_clear() -> dict[str, Any]:
         after = pipeline.document_count
         return {"status": "ok", "deleted_count": before - after}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # ── 按来源删除 ──
@@ -161,4 +159,4 @@ async def rag_delete_source(source: str) -> dict[str, Any]:
         deleted = pipeline.remove_source(source)
         return {"status": "ok", "source": source, "deleted_chunks": deleted}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

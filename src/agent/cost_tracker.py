@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -96,9 +95,11 @@ class CostTracker:
     def record_result(self, agent_name: str, result: Any) -> None:
         token_usage = getattr(result, "token_usage", {})
         if token_usage:
-            self.record_tokens(agent_name,
+            self.record_tokens(
+                agent_name,
                 prompt_tokens=token_usage.get("prompt", 0),
-                completion_tokens=token_usage.get("completion", 0))
+                completion_tokens=token_usage.get("completion", 0),
+            )
         tool_calls = getattr(result, "tool_calls_count", 0)
         if tool_calls:
             self._agent_tool_calls[agent_name] = self._agent_tool_calls.get(agent_name, 0) + tool_calls
@@ -117,7 +118,9 @@ class CostTracker:
             logger.warning(alert)
             return False
         if current_cost >= self.budget_usd * 0.8:
-            alert = f"⚠️ 预算已达 {current_cost / self.budget_usd * 100:.0f}%: ${current_cost:.4f} / ${self.budget_usd:.2f}"
+            alert = (
+                f"⚠️ 预算已达 {current_cost / self.budget_usd * 100:.0f}%: ${current_cost:.4f} / ${self.budget_usd:.2f}"
+            )
             if alert not in self._alerts:
                 self._alerts.append(alert)
             logger.warning(alert)
@@ -141,8 +144,9 @@ class CostTracker:
             return 0.0
         total_prompt = sum(s.get("prompt", 0) for s in self._agent_tokens.values())
         total_completion = sum(s.get("completion", 0) for s in self._agent_tokens.values())
-        return round((total_prompt / 1_000_000) * pricing["prompt"] +
-                     (total_completion / 1_000_000) * pricing["completion"], 6)
+        return round(
+            (total_prompt / 1_000_000) * pricing["prompt"] + (total_completion / 1_000_000) * pricing["completion"], 6
+        )
 
     # ------------------------------------------------------------------
     # 报告
@@ -201,8 +205,9 @@ class CostTracker:
             logger.warning(f"CostTracker persist failed: {exc}")
 
     @staticmethod
-    def query_history(db_path: str, *, session_id: str = "", agent_name: str = "",
-                      days: int = 7) -> list[dict[str, Any]]:
+    def query_history(
+        db_path: str, *, session_id: str = "", agent_name: str = "", days: int = 7
+    ) -> list[dict[str, Any]]:
         """查询历史成本记录。"""
         if not Path(db_path).exists():
             return []
@@ -220,8 +225,14 @@ class CostTracker:
         with sqlite3.connect(db_path) as conn:
             rows = conn.execute(query, params).fetchall()
         return [
-            {"session_id": r[0], "agent_name": r[1], "prompt_tokens": r[2],
-             "completion_tokens": r[3], "model": r[4], "recorded_at": r[5]}
+            {
+                "session_id": r[0],
+                "agent_name": r[1],
+                "prompt_tokens": r[2],
+                "completion_tokens": r[3],
+                "model": r[4],
+                "recorded_at": r[5],
+            }
             for r in rows
         ]
 

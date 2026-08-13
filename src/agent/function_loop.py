@@ -1,5 +1,3 @@
-
-
 """Function Calling 推理循环 — 基于 OpenAI tool_calls API（增强版 v2）。
 
 增强（v2）:
@@ -13,7 +11,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from agent.base import AgentResult, AgentState, AgentStep
 from core.logger import logger
@@ -47,6 +45,7 @@ class FunctionCallingLoop:
 
         if messages is None:
             from agent.context_builder import ContextBuilder
+
             messages = ContextBuilder.build_messages(agent, query, image_data=image_data)
 
         tools_schema = FunctionCallingLoop._build_tools_schema(agent)
@@ -98,7 +97,8 @@ class FunctionCallingLoop:
                     agent.state = AgentState.DONE
                     return AgentResult(
                         answer="（处理超时）",
-                        steps=steps, tool_calls_count=tool_calls_count,
+                        steps=steps,
+                        tool_calls_count=tool_calls_count,
                         loop_type="function",
                         total_elapsed_ms=round((time.perf_counter() - start_time) * 1000, 2),
                         token_usage=total_tokens,
@@ -112,7 +112,8 @@ class FunctionCallingLoop:
                     agent.state = AgentState.DONE
                     return AgentResult(
                         answer=content.strip(),
-                        steps=steps, tool_calls_count=tool_calls_count,
+                        steps=steps,
+                        tool_calls_count=tool_calls_count,
                         loop_type="function",
                         total_elapsed_ms=round((time.perf_counter() - start_time) * 1000, 2),
                         token_usage=total_tokens,
@@ -132,7 +133,9 @@ class FunctionCallingLoop:
                                 args = {"raw": tc["arguments"]}
                             future = executor.submit(
                                 FunctionCallingLoop._execute_tool,
-                                agent, tc["name"], args,
+                                agent,
+                                tc["name"],
+                                args,
                             )
                             futures[future] = i
 
@@ -146,11 +149,13 @@ class FunctionCallingLoop:
 
                         for i, tc in enumerate(tool_calls):
                             observation = results_map.get(i, "（执行超时��")
-                            tool_results.append({
-                                "tool_call_id": tc["id"],
-                                "role": "tool",
-                                "content": observation,
-                            })
+                            tool_results.append(
+                                {
+                                    "tool_call_id": tc["id"],
+                                    "role": "tool",
+                                    "content": observation,
+                                }
+                            )
                             tool_calls_count += 1
 
                         # 记录到 step
@@ -165,11 +170,13 @@ class FunctionCallingLoop:
                             args = {"raw": tc["arguments"]}
 
                         observation = FunctionCallingLoop._execute_tool(agent, tc["name"], args)
-                        tool_results.append({
-                            "tool_call_id": tc["id"],
-                            "role": "tool",
-                            "content": observation,
-                        })
+                        tool_results.append(
+                            {
+                                "tool_call_id": tc["id"],
+                                "role": "tool",
+                                "content": observation,
+                            }
+                        )
                         tool_calls_count += 1
                         step.action = tc["name"]
                         step.observation = observation
@@ -182,8 +189,11 @@ class FunctionCallingLoop:
                     "role": "assistant",
                     "content": content or None,
                     "tool_calls": [
-                        {"id": tc["id"], "type": "function",
-                         "function": {"name": tc["name"], "arguments": tc["arguments"]}}
+                        {
+                            "id": tc["id"],
+                            "type": "function",
+                            "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                        }
                         for tc in tool_calls
                     ],
                 }
@@ -194,7 +204,8 @@ class FunctionCallingLoop:
             agent.state = AgentState.DONE
             return AgentResult(
                 answer="（已达最大推理步数，未能得出最终答案）",
-                steps=steps, tool_calls_count=tool_calls_count,
+                steps=steps,
+                tool_calls_count=tool_calls_count,
                 loop_type="function",
                 total_elapsed_ms=round((time.perf_counter() - start_time) * 1000, 2),
                 token_usage=total_tokens,
@@ -204,7 +215,9 @@ class FunctionCallingLoop:
             agent.state = AgentState.ERROR
             logger.error(f"Agent [{agent.name}] FC loop error", extra={"error": str(exc)})
             return AgentResult(
-                error=str(exc), steps=steps, tool_calls_count=tool_calls_count,
+                error=str(exc),
+                steps=steps,
+                tool_calls_count=tool_calls_count,
                 loop_type="function",
                 total_elapsed_ms=round((time.perf_counter() - start_time) * 1000, 2),
                 token_usage=total_tokens,
@@ -219,6 +232,7 @@ class FunctionCallingLoop:
         if not agent.tools:
             return []
         from mcp_tools.registry import get_registry
+
         registry = get_registry()
         schemas: list[dict[str, Any]] = []
         for tname in agent.tools:
@@ -232,6 +246,7 @@ class FunctionCallingLoop:
         if tool_name not in agent.tools:
             return f"错误：工具 '{tool_name}' 不在 Agent [{agent.name}] 的允许列表中"
         from mcp_tools.registry import get_tool
+
         tool_instance = get_tool(tool_name)
         if tool_instance is None:
             return f"错误：工具 '{tool_name}' 未注册"
@@ -256,10 +271,7 @@ class FunctionCallingLoop:
     @staticmethod
     def _has_image(messages: list[dict[str, Any]]) -> bool:
         """检测消息列表中是否包含图片（多模态 content 数组）。"""
-        for msg in messages:
-            if isinstance(msg.get("content"), list):
-                return True
-        return False
+        return any(isinstance(msg.get("content"), list) for msg in messages)
 
     @staticmethod
     def _resolve_model(agent: BaseAgent, messages: list[dict[str, Any]]) -> str | None:

@@ -11,17 +11,14 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Optional
-
-from core.logger import logger
-from rag.document_parser import parse_file
+from typing import Any
 
 # 触发 mcp_tools 下所有 @register_tool 装饰器执行，完成工具注册
 import mcp_tools.tools  # noqa: F401
+from core.logger import logger
 
 # ── 加载 .env ──
 try:
@@ -38,6 +35,7 @@ except Exception:
 _HAS_STREAMLIT = False
 try:
     import streamlit as st
+
     _HAS_STREAMLIT = True
 except ImportError:
     st = None  # type: ignore[assignment]
@@ -55,6 +53,7 @@ if _HAS_STREAMLIT:
 
 
 # ── 应用状态 ──
+
 
 class AppState:
     """Streamlit 会话状态管理。"""
@@ -84,7 +83,7 @@ class AppState:
         cfg_hash = hash(json.dumps(_facade_cfg, sort_keys=True, default=str))
         prev_hash = st.session_state.get("_facade_cfg_hash")
         if prev_hash != cfg_hash or key not in st.session_state:
-            from business.service_facade import ServiceFacade, ServiceConfig
+            from business.service_facade import ServiceConfig, ServiceFacade
 
             config = ServiceConfig.from_env()
             if kwargs.get("api_key"):
@@ -198,6 +197,7 @@ def render_sidebar() -> dict[str, Any]:
 
         # 护栏状态
         from security.guardrails import get_guardrails
+
         guardrails = get_guardrails()
         stats = guardrails.get_stats()
         if stats["total_checked"] > 0:
@@ -260,12 +260,10 @@ def render_chat(config: dict[str, Any]) -> None:
     master_tc = st.session_state.get("_last_master_tool_calls", 0)
     master_elapsed = st.session_state.get("_last_master_elapsed", 0)
     if master_steps and messages and messages[-1]["role"] == "assistant":
-        with st.expander(
-            f"🎯 主 Agent 编排过程 ({master_tc} 次委派, {master_elapsed:.0f}ms)", expanded=False
-        ):
+        with st.expander(f"🎯 主 Agent 编排过程 ({master_tc} 次委派, {master_elapsed:.0f}ms)", expanded=False):
             for step in master_steps:
                 if step.get("thought"):
-                    st.markdown(f"**💭 思考**")
+                    st.markdown("**💭 思考**")
                     st.info(step["thought"][:300])
                 if step.get("action"):
                     agent_name = step.get("action_input", {}).get("agent_name", "?")
@@ -273,7 +271,7 @@ def render_chat(config: dict[str, Any]) -> None:
                     st.markdown(f"**📤 委派给 `{agent_name}`**")
                     st.caption(f"任务: {task_preview}...")
                 if step.get("observation"):
-                    st.markdown(f"**📥 专家回复**")
+                    st.markdown("**📥 专家回复**")
                     st.success(step["observation"][:500])
                 st.markdown("---")
 
@@ -281,15 +279,11 @@ def render_chat(config: dict[str, Any]) -> None:
     ma_results = st.session_state.get("_last_multi_agent_results", {})
     ma_elapsed = st.session_state.get("_last_multi_agent_elapsed", 0)
     if ma_results and messages and messages[-1]["role"] == "assistant":
-        with st.expander(
-            f"🔍 各专家详细分析 ({len(ma_results)} 个专家 | 并行耗时 {ma_elapsed:.0f}ms)", expanded=False
-        ):
+        with st.expander(f"🔍 各专家详细分析 ({len(ma_results)} 个专家 | 并行耗时 {ma_elapsed:.0f}ms)", expanded=False):
             for name, detail in ma_results.items():
                 status = "✅" if detail.get("success") else "❌"
                 with st.container():
-                    st.markdown(
-                        f"**{status} {name}** ({detail.get('elapsed_ms', 0):.0f}ms)"
-                    )
+                    st.markdown(f"**{status} {name}** ({detail.get('elapsed_ms', 0):.0f}ms)")
                     if detail.get("success"):
                         st.markdown(detail.get("answer", ""))
                     else:
@@ -308,6 +302,7 @@ def render_chat(config: dict[str, Any]) -> None:
     )
     if uploaded_image is not None:
         import base64
+
         img_bytes = uploaded_image.getvalue()
         if len(img_bytes) > 5 * 1024 * 1024:
             st.warning("图片超过 5MB，已忽略")
@@ -315,7 +310,7 @@ def render_chat(config: dict[str, Any]) -> None:
             # 推断 MIME 类型
             mime = "image/png" if uploaded_image.name.lower().endswith(".png") else "image/jpeg"
             image_data = f"data:{mime};base64,{base64.b64encode(img_bytes).decode()}"
-            st.caption(f"📎 已选择图片: {uploaded_image.name} ({len(img_bytes)//1024}KB)")
+            st.caption(f"📎 已选择图片: {uploaded_image.name} ({len(img_bytes) // 1024}KB)")
 
     if prompt := st.chat_input("输入消息..."):
         AppState.add_message("user", prompt)
@@ -367,17 +362,13 @@ def render_chat(config: dict[str, Any]) -> None:
             for event in facade.master_agent_chat_stream(query=prompt):
                 if event["type"] == "think":
                     thought = event.get("thought", "")
-                    steps_text.append(
-                        "💭 **思考**\n\n" + thought
-                    )
+                    steps_text.append("💭 **思考**\n\n" + thought)
                     collected_steps.append({"thought": thought})
                 elif event["type"] == "delegate":
                     tool_name = event.get("tool", "")
                     task = event.get("task", "")
                     t = task[:200] + "..." if len(task) > 200 else task
-                    steps_text.append(
-                        f"📤 **委派给 {tool_name}**\n\n{t}"
-                    )
+                    steps_text.append(f"📤 **委派给 {tool_name}**\n\n{t}")
                     if collected_steps:
                         collected_steps[-1]["action"] = tool_name
                         collected_steps[-1]["action_input"] = {
@@ -389,9 +380,7 @@ def render_chat(config: dict[str, Any]) -> None:
                     result_text = str(event.get("result", ""))
                     ms = event.get("elapsed_ms", 0)
                     r = result_text[:300] + "..." if len(result_text) > 300 else result_text
-                    steps_text.append(
-                        f"📥 **{tool_name} 回复** (耗时 {ms:.0f}ms)\n\n{r}"
-                    )
+                    steps_text.append(f"📥 **{tool_name} 回复** (耗时 {ms:.0f}ms)\n\n{r}")
                     tool_calls_count += 1
                     if collected_steps:
                         collected_steps[-1]["observation"] = r
@@ -418,12 +407,8 @@ def render_chat(config: dict[str, Any]) -> None:
 
             # 更新用量
             cost_data = st.session_state.get(AppState.KEY_COST, {})
-            cost_data["tokens"] = cost_data.get("tokens", 0) + final_token_usage.get(
-                "total_tokens", 0
-            )
-            cost_data["cost"] = cost_data.get("cost", 0) + final_token_usage.get(
-                "total_cost", 0
-            )
+            cost_data["tokens"] = cost_data.get("tokens", 0) + final_token_usage.get("total_tokens", 0)
+            cost_data["cost"] = cost_data.get("cost", 0) + final_token_usage.get("total_cost", 0)
             st.session_state[AppState.KEY_COST] = cost_data
             st.rerun()
         else:
@@ -468,7 +453,8 @@ def render_rag_panel(config: dict[str, Any]) -> None:
                 if pipeline:
                     # 写入临时文件
                     with tempfile.NamedTemporaryFile(
-                        delete=False, suffix=Path(uploaded_file.name).suffix  # type: ignore[arg-type]
+                        delete=False,
+                        suffix=Path(uploaded_file.name).suffix,  # type: ignore[arg-type]
                     ) as tmp:
                         tmp.write(uploaded_file.getvalue())  # type: ignore[union-attr]
                         tmp_path = tmp.name
@@ -477,9 +463,7 @@ def render_rag_panel(config: dict[str, Any]) -> None:
                         if result.get("chunks", 0) == 0:
                             st.warning(f"`{uploaded_file.name}` 已处理但未生成片段")
                         else:
-                            st.success(
-                                f"`{uploaded_file.name}` 已入库 (共 {result['chunks']} 个片段)"
-                            )
+                            st.success(f"`{uploaded_file.name}` 已入库 (共 {result['chunks']} 个片段)")
                             # 上传成功后改变 counter，强制创建新的 file_uploader
                             st.session_state["_rag_upload_counter"] = upload_counter + 1
                             st.rerun()
@@ -499,9 +483,7 @@ def render_rag_panel(config: dict[str, Any]) -> None:
                 facade = AppState.get_facade(**config)
                 pipeline = facade.rag_pipeline
                 if pipeline:
-                    result = pipeline.ingest_text(
-                        manual_text, metadata={"source": "manual"}, source="manual"
-                    )
+                    result = pipeline.ingest_text(manual_text, metadata={"source": "manual"}, source="manual")
                     if result.get("chunks", 0) == 0:
                         st.warning("文本已处理但未生成片段")
                     else:
@@ -533,11 +515,11 @@ def render_rag_panel(config: dict[str, Any]) -> None:
                                 if st.button("删除", key=btn_key, type="secondary"):
                                     try:
                                         deleted = pipeline.remove_source(src["source"])
-                                        st.success(
-                                            f"已删除 {src['source']} ({deleted} 个片段)"
-                                        )
+                                        st.success(f"已删除 {src['source']} ({deleted} 个片段)")
                                         # 改变 counter 强制创建新的 file_uploader，防止重复上传
-                                        st.session_state["_rag_upload_counter"] = st.session_state.get("_rag_upload_counter", 0) + 1
+                                        st.session_state["_rag_upload_counter"] = (
+                                            st.session_state.get("_rag_upload_counter", 0) + 1
+                                        )
                                         st.rerun()
                                     except Exception as exc:
                                         st.error(f"删除失败: {exc}")
@@ -554,7 +536,9 @@ def render_rag_panel(config: dict[str, Any]) -> None:
                                 pipeline.clear_all()
                                 st.success("知识库已清空")
                                 # 改变 counter 强制创建新的 file_uploader，防止重复上传
-                                st.session_state["_rag_upload_counter"] = st.session_state.get("_rag_upload_counter", 0) + 1
+                                st.session_state["_rag_upload_counter"] = (
+                                    st.session_state.get("_rag_upload_counter", 0) + 1
+                                )
                                 st.rerun()
                             except Exception as exc:
                                 st.error(f"清空失败: {exc}")

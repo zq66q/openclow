@@ -5,11 +5,10 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
-from mcp_tools.base import Tool, ToolMeta, ToolDangerLevel
+from mcp_tools.base import Tool, ToolDangerLevel, ToolMeta
 from mcp_tools.registry import register_tool
 
 
@@ -19,8 +18,7 @@ class ReadFileTool(Tool):
 
     name = "read_file"
     description = (
-        "读取文本文件内容。支持按行号范围读取（offset + limit），"
-        "支持自动检测编码。文件路径必须在项目安全目录内。"
+        "读取文本文件内容。支持按行号范围读取（offset + limit），支持自动检测编码。文件路径必须在项目安全目录内。"
     )
     parameters: dict[str, Any] = {
         "type": "object",

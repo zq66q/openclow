@@ -18,9 +18,9 @@ from core.logger import logger
 from core.settings import settings
 
 if TYPE_CHECKING:
-    from memory.memory_manager import MemoryManager
-    from memory.extractor import MemoryExtractor
     from core.llm_client import BaseLLMClient
+    from memory.extractor import MemoryExtractor
+    from memory.memory_manager import MemoryManager
 
 
 class MemoryCompressor:
@@ -78,10 +78,7 @@ class MemoryCompressor:
         if stm.message_count() < self.MIN_MESSAGES:
             return False
 
-        if time.time() - self._last_compress < self.MIN_INTERVAL:
-            return False
-
-        return True
+        return time.time() - self._last_compress >= self.MIN_INTERVAL
 
     # ------------------------------------------------------------------
     # 压缩
@@ -111,14 +108,9 @@ class MemoryCompressor:
         self._last_compress = time.time()
 
         # 3. 从被压缩的消息中抽取结构化事实 → 长期记忆
-        if len(messages_before) > self.MAX_KEEP:
-            to_extract = messages_before[:-self.MAX_KEEP]
-        else:
-            to_extract = messages_before
+        to_extract = messages_before[: -self.MAX_KEEP] if len(messages_before) > self.MAX_KEEP else messages_before
 
-        dialog = "\n".join(
-            f"[{m.role}]: {m.content}" for m in to_extract
-        )
+        dialog = "\n".join(f"[{m.role}]: {m.content}" for m in to_extract)
         extracted = self._extractor.extract_and_save(dialog)
 
         # 4. 摘要本身也存入长期记忆（episode 类型）

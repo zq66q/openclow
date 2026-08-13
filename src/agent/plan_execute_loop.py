@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from agent.base import AgentResult, AgentState
 from core.logger import logger
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 class PlanExecuteLoop:
     """Plan-and-Execute 循环（纯静态方法）。"""
 
-    MAX_REPLAN_ROUNDS = 2     # 最大重规划轮数
-    MAX_STEP_RETRIES = 1      # 单步失败重试次数
+    MAX_REPLAN_ROUNDS = 2  # 最大重规划轮数
+    MAX_STEP_RETRIES = 1  # 单步失败重试次数
 
     # ── 公开入口 ──
 
@@ -56,13 +56,15 @@ class PlanExecuteLoop:
             # ── Phase 1: Plan ──
             plan = PlanExecuteLoop._plan(agent, query, total_tokens)
             if step_callback:
-                step_callback({
-                    "type": "think",
-                    "step": 0,
-                    "thought": f"已生成执行计划（共 {len(plan)} 步）",
-                    "action": "plan",
-                    "action_input": {"plan": plan},
-                })
+                step_callback(
+                    {
+                        "type": "think",
+                        "step": 0,
+                        "thought": f"已生成执行计划（共 {len(plan)} 步）",
+                        "action": "plan",
+                        "action_input": {"plan": plan},
+                    }
+                )
 
             # ── Phase 2: Execute + Review (loop) ──
             final_answer: str = ""
@@ -90,18 +92,18 @@ class PlanExecuteLoop:
                     all_tool_calls += step_result.get("tool_calls", 0)
 
                 # 2b. 步骤全部执行后，综合 Review
-                review = PlanExecuteLoop._review(
-                    agent, query, plan, all_executed_results, total_tokens
-                )
+                review = PlanExecuteLoop._review(agent, query, plan, all_executed_results, total_tokens)
 
                 if step_callback:
-                    step_callback({
-                        "type": "think",
-                        "step": len(plan) + 1,
-                        "thought": f"Review 结果: {review.get('status', 'unknown')}",
-                        "action": "review",
-                        "action_input": review,
-                    })
+                    step_callback(
+                        {
+                            "type": "think",
+                            "step": len(plan) + 1,
+                            "thought": f"Review 结果: {review.get('status', 'unknown')}",
+                            "action": "review",
+                            "action_input": review,
+                        }
+                    )
 
                 if review.get("complete", False):
                     final_answer = review.get("answer", "")
@@ -119,28 +121,30 @@ class PlanExecuteLoop:
                     )
                     plan = PlanExecuteLoop._plan(agent, query, total_tokens, extra=extra_prompt)
                     if step_callback:
-                        step_callback({
-                            "type": "think",
-                            "step": len(all_executed_results) + 2,
-                            "thought": f"第 {replan_round} 轮重新规划，新增 {len(plan)} 个步骤",
-                            "action": "replan",
-                            "action_input": {"round": replan_round, "new_plan": plan},
-                        })
+                        step_callback(
+                            {
+                                "type": "think",
+                                "step": len(all_executed_results) + 2,
+                                "thought": f"第 {replan_round} 轮重新规划，新增 {len(plan)} 个步骤",
+                                "action": "replan",
+                                "action_input": {"round": replan_round, "new_plan": plan},
+                            }
+                        )
 
             # 如果循环耗尽仍未完成，强制综合
             if not final_answer:
-                final_answer = PlanExecuteLoop._force_synthesize(
-                    agent, query, all_executed_results, total_tokens
-                )
+                final_answer = PlanExecuteLoop._force_synthesize(agent, query, all_executed_results, total_tokens)
 
             elapsed = (time.perf_counter() - start_time) * 1000
             agent.state = AgentState.DONE
 
             if step_callback:
-                step_callback({
-                    "type": "final",
-                    "answer": final_answer,
-                })
+                step_callback(
+                    {
+                        "type": "final",
+                        "answer": final_answer,
+                    }
+                )
 
             return AgentResult(
                 answer=final_answer,
@@ -199,12 +203,12 @@ class PlanExecuteLoop:
             "请以 JSON 数组返回计划，每个步骤包含:\n"
             "- step: 步骤编号 (整数)\n"
             "- description: 本步骤要做什么 (中文)\n"
-            "- tool: 使用的工具名 (如果没有合适的工具，填 \"none\")\n"
+            '- tool: 使用的工具名 (如果没有合适的工具，填 "none")\n'
             "- input: 传给工具的输入参数\n\n"
             "## 规则\n"
             "- 步骤要独立、可执行、有明确产出\n"
             "- 每个步骤只做一件事\n"
-            "- 如果不需要工具，tool 填 \"none\"\n"
+            '- 如果不需要工具，tool 填 "none"\n'
             "- 必须在最后输出 JSON 数组，不要加其他文字\n\n"
             "## 用户问题\n"
             f"{query}\n"
@@ -272,11 +276,7 @@ class PlanExecuteLoop:
 
         # 无需工具 → LLM 直接回答
         if not tool_name or tool_name == "none":
-            answer_prompt = (
-                f"根据以下问题完成第 {step_num} 步任务:\n"
-                f"任务: {description}\n\n"
-                f"请完成此步骤并给出结果。"
-            )
+            answer_prompt = f"根据以下问题完成第 {step_num} 步任务:\n任务: {description}\n\n请完成此步骤并给出结果。"
             msgs = [{"role": "system", "content": answer_prompt}]
             raw, usage = agent.llm_client.chat(msgs, temperature=0.5)
             PlanExecuteLoop._add_tokens(total_tokens, usage)
@@ -285,13 +285,15 @@ class PlanExecuteLoop:
 
         # 需要工具 → 执行工具调用
         if step_callback:
-            step_callback({
-                "type": "think",
-                "step": step_num,
-                "thought": f"执行步骤 {step_num}: {description}",
-                "action": tool_name,
-                "action_input": {"input": str(tool_input)[:200]},
-            })
+            step_callback(
+                {
+                    "type": "think",
+                    "step": step_num,
+                    "thought": f"执行步骤 {step_num}: {description}",
+                    "action": tool_name,
+                    "action_input": {"input": str(tool_input)[:200]},
+                }
+            )
 
         # 执行工具（带重试）
         tool_args = PlanExecuteLoop._prepare_tool_args(tool_input)
@@ -299,13 +301,15 @@ class PlanExecuteLoop:
         result["tool_calls"] = 1
 
         if step_callback:
-            step_callback({
-                "type": "tool_result",
-                "step": step_num,
-                "tool": tool_name,
-                "result": str(tool_result.get("result", ""))[:300],
-                "elapsed_ms": tool_result.get("elapsed_ms", 0),
-            })
+            step_callback(
+                {
+                    "type": "tool_result",
+                    "step": step_num,
+                    "tool": tool_name,
+                    "result": str(tool_result.get("result", ""))[:300],
+                    "elapsed_ms": tool_result.get("elapsed_ms", 0),
+                }
+            )
 
         if tool_result.get("success"):
             result["output"] = str(tool_result.get("result", ""))
@@ -335,6 +339,7 @@ class PlanExecuteLoop:
         """安全调用工具（不抛异常）。"""
         try:
             from mcp_tools.registry import get_tool
+
             tool = get_tool(tool_name)
             if tool is None:
                 return {"success": False, "error": f"未知工具: {tool_name}", "result": None, "elapsed_ms": 0}
@@ -368,12 +373,12 @@ class PlanExecuteLoop:
             f"## 执行结果\n{results_text}\n\n"
             "## 输出格式\n"
             "请以 JSON 格式返回:\n"
-            '{\n'
+            "{\n"
             '  "complete": true/false,\n'
             '  "answer": "如果 complete=true，给出综合后的最终答案",\n'
             '  "missing": "如果 complete=false，列出还缺少什么",\n'
             '  "status": "completed/partial/failed"\n'
-            '}\n\n'
+            "}\n\n"
             "## 判断标准\n"
             "- 所有步骤都有有意义的结果 → complete=true\n"
             "- 有步骤失败或结果不足以回答问题 → complete=false\n"

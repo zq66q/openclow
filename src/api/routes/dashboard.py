@@ -13,6 +13,7 @@ router = APIRouter(tags=["仪表盘"])
 
 def _get_svc() -> Any:
     from api.server import get_facade
+
     return get_facade()
 
 
@@ -59,4 +60,4 @@ async def memory_search(query: str = "", user_id: str = "default") -> dict[str, 
         results = mm.search(query, user_id=user_id)
         return {"query": query, "results": results}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

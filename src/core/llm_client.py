@@ -1,4 +1,4 @@
-#这是一套大模型统一调用工具，不管是 OpenAI、DeepSeek、通义千问、硅基流动，
+# 这是一套大模型统一调用工具，不管是 OpenAI、DeepSeek、通义千问、硅基流动，
 # 只要接口格式和 OpenAI 一样，全部用同一套代码调用；自动统计 token 消耗、统一报错、支持图文多模态、函数调用（工具调用），
 # 用工厂模式全局复用客户端，业务代码直接调用chat()就能发消息给大模型
 
@@ -10,9 +10,9 @@
 
 from __future__ import annotations
 
-import json
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 from core.exceptions import ConfigError, LLMContextWindowError, LLMError, LLMRateLimitError, LLMTimeoutError
 from core.logger import get_trace_id, logger
@@ -181,12 +181,11 @@ class OpenAIClient(BaseLLMClient):
         try:
             from openai import OpenAI
         except ImportError as exc:
-            raise ConfigError(
-                "openai 包未安装，请执行: pip install openai"
-            ) from exc
+            raise ConfigError("openai 包未安装，请执行: pip install openai") from exc
 
         # 读取系统代理（HTTP_PROXY / HTTPS_PROXY）
         import os
+
         proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
 
         def _build_client(api_key_: str, base_url_: str) -> Any:
@@ -197,6 +196,7 @@ class OpenAIClient(BaseLLMClient):
             }
             if proxy:
                 import httpx
+
                 http_client = httpx.Client(timeout=timeout, proxy=proxy)
                 client_kwargs["http_client"] = http_client
             return OpenAI(**client_kwargs)
@@ -206,7 +206,7 @@ class OpenAIClient(BaseLLMClient):
         if vision_base_url and vision_base_url != base_url:
             self._vision_client = _build_client(self._vision_api_key, self._vision_base_url)
             logger.info(
-                f"LLM vision client created",
+                "LLM vision client created",
                 extra={"vision_model": self._vision_model, "vision_base_url": self._vision_base_url},
             )
         else:
@@ -426,6 +426,7 @@ class OpenAIClient(BaseLLMClient):
 # ------------------------------------------------------------------------------
 # 工厂类
 # ------------------------------------------------------------------------------
+
 
 class LLMFactory:
     """按配置动态创建 LLM 客户端。"""

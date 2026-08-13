@@ -1,4 +1,4 @@
-#Agent 抽象基类
+# Agent 抽象基类
 
 """Agent 基类 — 定义智能体的生命周期、属性与核心接口（增强版 v2）。
 
@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncIterator, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from core.logger import logger
 
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 class AgentState(str, Enum):
     """Agent 运行时状态。"""
+
     IDLE = "idle"
     RUNNING = "running"
     DONE = "done"
@@ -37,6 +38,7 @@ class AgentState(str, Enum):
 @dataclass
 class AgentStep:
     """单个推理步骤的记录。"""
+
     step_num: int
     thought: str = ""
     action: str = ""
@@ -48,6 +50,7 @@ class AgentStep:
 @dataclass
 class AgentResult:
     """Agent 执行结果。"""
+
     answer: str = ""
     steps: list[AgentStep] = field(default_factory=list)
     tool_calls_count: int = 0
@@ -64,6 +67,7 @@ class AgentResult:
 @dataclass
 class StreamChunk:
     """流式输出片段。"""
+
     content: str = ""
     is_final: bool = False
     event_type: str = ""  # "token" | "tool_call" | "thought" | "final"
@@ -92,6 +96,7 @@ class CancellationToken:
 
 class AgentCancelledError(Exception):
     """Agent 被取消的异常。"""
+
     pass
 
 
@@ -163,6 +168,7 @@ class BaseAgent:
     def llm_client(self):
         if self._llm_client is None:
             from core.llm_client import get_llm_client
+
             self._llm_client = get_llm_client()
         return self._llm_client
 
@@ -186,11 +192,18 @@ class BaseAgent:
     # 对外入口
     # ------------------------------------------------------------------
 
-    def run(self, query: str, *, cancel_token: CancellationToken | None = None,
-            step_callback: callable | None = None, image_data: str | None = None) -> AgentResult:
+    def run(
+        self,
+        query: str,
+        *,
+        cancel_token: CancellationToken | None = None,
+        step_callback: callable | None = None,
+        image_data: str | None = None,
+    ) -> AgentResult:
         """同步执行入口。"""
         self._cancel_token = cancel_token
         from agent.executor import AgentExecutor
+
         return AgentExecutor.run(self, query, step_callback=step_callback, image_data=image_data)
 
     async def arun(self, query: str, *, cancel_token: CancellationToken | None = None) -> AgentResult:
@@ -220,8 +233,12 @@ class BaseAgent:
         try:
             result = self.run(query)
             if result.success:
-                yield StreamChunk(content=result.answer, is_final=True, event_type="final",
-                                  metadata={"token_usage": result.token_usage, "elapsed_ms": result.total_elapsed_ms})
+                yield StreamChunk(
+                    content=result.answer,
+                    is_final=True,
+                    event_type="final",
+                    metadata={"token_usage": result.token_usage, "elapsed_ms": result.total_elapsed_ms},
+                )
             else:
                 yield StreamChunk(content=f"错误: {result.error}", is_final=True, event_type="error")
         except AgentCancelledError:
@@ -239,6 +256,7 @@ class BaseAgent:
             return "（无可用工具）"
 
         from mcp_tools.registry import get_registry
+
         registry = get_registry()
         lines: list[str] = []
         for tname in self.tools:

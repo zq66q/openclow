@@ -1,14 +1,15 @@
-#Pydantic 配置中心，管理所有环境配置
+# Pydantic 配置中心，管理所有环境配置
 
 """全局配置中心 - Pydantic Settings 强类型管理.
 
 三层优先级：环境变量 > .env 文件 > 代码默认值.
 """
 
-from dotenv import load_dotenv
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
 from typing import Literal
+
+from dotenv import load_dotenv
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 预加载 .env 文件，确保 Pydantic BaseSettings 能读取到环境变量
 load_dotenv(".env", override=True)
@@ -16,6 +17,7 @@ load_dotenv(".env", override=True)
 
 class LLMConfig(BaseSettings):
     """LLM 大模型配置组."""
+
     model_config = SettingsConfigDict(env_prefix="LLM_")
 
     provider: str = Field(default="openai")
@@ -34,6 +36,7 @@ class LLMConfig(BaseSettings):
 
 class LLMMiniConfig(BaseSettings):
     """小模型配置（摘要、路由等低成本场景）."""
+
     model_config = SettingsConfigDict(env_prefix="LLM_MINI_")
 
     provider: str = Field(default="openai")
@@ -44,6 +47,7 @@ class LLMMiniConfig(BaseSettings):
 
 class EmbeddingConfig(BaseSettings):
     """Embedding 嵌入模型配置."""
+
     model_config = SettingsConfigDict(env_prefix="EMBEDDING_")
 
     provider: str = Field(default="openai")
@@ -54,6 +58,7 @@ class EmbeddingConfig(BaseSettings):
 
 class RAGConfig(BaseSettings):
     """RAG 知识库配置."""
+
     model_config = SettingsConfigDict(env_prefix="RAG_")
 
     vector_store_type: Literal["chroma", "qdrant", "milvus"] = Field(default="chroma")
@@ -67,6 +72,7 @@ class RAGConfig(BaseSettings):
 
 class MCPConfig(BaseSettings):
     """MCP 工具层配置."""
+
     model_config = SettingsConfigDict(env_prefix="MCP_")
 
     tool_timeout: int = Field(default=30)
@@ -77,6 +83,7 @@ class MCPConfig(BaseSettings):
 
 class MemoryConfig(BaseSettings):
     """分层记忆系统配置."""
+
     model_config = SettingsConfigDict(env_prefix="MEMORY_")
 
     db_path: str = Field(default="./data/memory.db")
@@ -87,6 +94,7 @@ class MemoryConfig(BaseSettings):
 
 class APIConfig(BaseSettings):
     """API 服务配置."""
+
     model_config = SettingsConfigDict(env_prefix="API_")
 
     host: str = Field(default="0.0.0.0")
@@ -96,6 +104,7 @@ class APIConfig(BaseSettings):
 
 class UIConfig(BaseSettings):
     """前端 UI 配置."""
+
     model_config = SettingsConfigDict(env_prefix="STREAMLIT_")
 
     port: int = Field(default=8501)
@@ -104,6 +113,7 @@ class UIConfig(BaseSettings):
 
 class AuditConfig(BaseSettings):
     """审计日志配置."""
+
     model_config = SettingsConfigDict(env_prefix="AUDIT_")
 
     log_path: str = Field(default="./data/audit_logs")
@@ -112,6 +122,7 @@ class AuditConfig(BaseSettings):
 
 class SecurityConfig(BaseSettings):
     """安全配置."""
+
     model_config = SettingsConfigDict(env_prefix="")
 
     file_sandbox_root: str = Field(default="./data/uploads", alias="FILE_SANDBOX_ROOT")
@@ -121,6 +132,7 @@ class SecurityConfig(BaseSettings):
 
 class Settings(BaseSettings):
     """全局配置聚合."""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

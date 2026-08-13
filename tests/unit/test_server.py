@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
@@ -16,6 +16,7 @@ import pytest
 def _is_fastapi_available() -> bool:
     try:
         import fastapi  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -24,6 +25,7 @@ def _is_fastapi_available() -> bool:
 def _is_httpx_available() -> bool:
     try:
         import httpx  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -76,6 +78,7 @@ class TestEndpoints:
 
         try:
             from fastapi.testclient import TestClient
+
             return TestClient(app)
         except ImportError:
             pytest.skip("TestClient not available (install httpx)")
@@ -91,10 +94,13 @@ class TestEndpoints:
 
     def test_chat_endpoint(self, client):
         """POST /chat 返回回答。"""
-        response = client.post("/chat", json={
-            "query": "测试消息",
-            "scenario": "general_assistant",
-        })
+        response = client.post(
+            "/chat",
+            json={
+                "query": "测试消息",
+                "scenario": "general_assistant",
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "answer" in data
@@ -102,10 +108,13 @@ class TestEndpoints:
 
     def test_chat_endpoint_with_stream(self, client):
         """POST /chat stream=True。"""
-        response = client.post("/chat", json={
-            "query": "测试",
-            "stream": True,
-        })
+        response = client.post(
+            "/chat",
+            json={
+                "query": "测试",
+                "stream": True,
+            },
+        )
         assert response.status_code in (200, 501)
 
     def test_sessions_list(self, client):
@@ -119,10 +128,13 @@ class TestEndpoints:
 
     def test_sessions_create(self, client):
         """POST /sessions 创建会话。"""
-        response = client.post("/sessions", json={
-            "user_id": "test",
-            "title": "新会话",
-        })
+        response = client.post(
+            "/sessions",
+            json={
+                "user_id": "test",
+                "title": "新会话",
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "session_id" in data
@@ -237,16 +249,16 @@ class TestWebSocket:
 
     def test_ws_endpoint_imports_work(self, tmp_facade):
         """WebSocket 端点使用的所有依赖可正常导入。"""
+
         from api.server import create_app
-        import asyncio
-        import json
 
         app = create_app(facade=tmp_facade)
         assert app is not None
 
         # 验证 FastAPI WebSocket 可用
         try:
-            from fastapi import WebSocket, WebSocketDisconnect
+            from fastapi import WebSocket
+
             assert WebSocket is not None
         except ImportError:
             pytest.skip("FastAPI WebSocket not available")

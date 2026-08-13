@@ -9,7 +9,16 @@
 """
 
 from rag.chunker import Chunk, CodeChunker, MarkdownChunker, TextChunker
-from rag.document_parser import parse_file, parse_pdf, parse_docx, parse_pptx, parse_excel, parse_html, parse_csv, parse_text
+from rag.document_parser import (
+    parse_csv,
+    parse_docx,
+    parse_excel,
+    parse_file,
+    parse_html,
+    parse_pdf,
+    parse_pptx,
+    parse_text,
+)
 from rag.pipeline import RAGPipeline
 from rag.retriever import HybridRetriever
 from rag.vector_store import VectorStore

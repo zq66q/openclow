@@ -1,6 +1,6 @@
-#这是文本向量化（Embedding 向量）专用工具类，把文字变成一串数字向量（用来知识库相似度对比），自带两大省钱优化：
-#缓存：一模一样的文本不用重复调用大模型接口，直接读内存；
-#自动分批：一次性传入很多文字时，自动切割成小批次调用接口，防止超过模型单次最大条数限制。
+# 这是文本向量化（Embedding 向量）专用工具类，把文字变成一串数字向量（用来知识库相似度对比），自带两大省钱优化：
+# 缓存：一模一样的文本不用重复调用大模型接口，直接读内存；
+# 自动分批：一次性传入很多文字时，自动切割成小批次调用接口，防止超过模型单次最大条数限制。
 
 """Embedding 客户端 — 文本向量化能力（内部共用模块）。
 
@@ -101,7 +101,7 @@ class EmbeddingClient:
         raw_texts = [t for _, t in to_embed]
         # 在 batch_size 内再次拆批
         for start in range(0, len(raw_texts), self._batch_size):
-            batch = raw_texts[start:start + self._batch_size]
+            batch = raw_texts[start : start + self._batch_size]
             batch_indices = [to_embed[start + j][0] for j in range(len(batch))]
 
             logger.debug("embed batch start", extra={"model": model, "batch_size": len(batch), "trace_id": trace_id})

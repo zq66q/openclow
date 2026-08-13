@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -20,8 +21,8 @@ from core.logger import get_trace_id, logger
 class ToolDangerLevel(str, Enum):
     """工具危险等级。"""
 
-    SAFE = "safe"        # 只读操作，直接执行
-    WRITE = "write"      # 写入操作，需确认
+    SAFE = "safe"  # 只读操作，直接执行
+    WRITE = "write"  # 写入操作，需确认
     DANGEROUS = "dangerous"  # 高危操作，必须人在回路审批
 
 
@@ -29,10 +30,10 @@ class ToolDangerLevel(str, Enum):
 class ToolMeta:
     """工具运行时元数据。"""
 
-    timeout: int = 30              # 单次调用超时（秒）
-    max_retries: int = 3           # 最大重试次数
+    timeout: int = 30  # 单次调用超时（秒）
+    max_retries: int = 3  # 最大重试次数
     danger_level: ToolDangerLevel = ToolDangerLevel.SAFE
-    need_approval: bool = False    # 是否需要人工审批
+    need_approval: bool = False  # 是否需要人工审批
     tags: list[str] = field(default_factory=list)  # 分类标签
 
 

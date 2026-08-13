@@ -7,7 +7,7 @@ try:
 except ImportError:
     pytest = None  # type: ignore[assignment]
 
-from business.service_facade import ServiceConfig, ServiceStatus, HealthReport
+from business.service_facade import HealthReport, ServiceConfig, ServiceStatus
 
 
 class TestServiceConfig:

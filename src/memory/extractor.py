@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 from core.logger import logger
 
 if TYPE_CHECKING:
-    from memory.memory_manager import MemoryManager
     from core.llm_client import BaseLLMClient
+    from memory.memory_manager import MemoryManager
 
 # ---------------------------------------------------------------------------
 # Prompt

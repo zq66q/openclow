@@ -12,18 +12,18 @@ from __future__ import annotations
 import pickle
 import re
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from core.embedding_client import EmbeddingClient
 from core.logger import get_trace_id, logger
 from core.settings import settings
 from rag.vector_store import VectorStore
 
-
 # 中文分词（可选 jieba）
 _JIEBA_AVAILABLE = False
 try:
     import jieba
+
     _JIEBA_AVAILABLE = True
 except ImportError:
     pass
@@ -77,7 +77,9 @@ class HybridRetriever:
         top_k = top_k or settings.rag.top_k_rerank
         trace_id = get_trace_id()
 
-        logger.info("hybrid_retrieve start", extra={"query": query[:80], "top_k": top_k, "where": where, "trace_id": trace_id})
+        logger.info(
+            "hybrid_retrieve start", extra={"query": query[:80], "top_k": top_k, "where": where, "trace_id": trace_id}
+        )
 
         # Step 1: 向量检索
         query_vector = self.embed_client.embed_text(query)
@@ -109,7 +111,7 @@ class HybridRetriever:
 
     def build_bm25_index(self) -> int:
         """构建/重建 BM25 索引（从向量库全量加载）。
-        
+
         Returns:
             索引中的文档数
         """
@@ -177,11 +179,6 @@ class HybridRetriever:
 
     def _bm25_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
         """BM25 关键词检索（自动重建脏索引）。"""
-        try:
-            from rank_bm25 import BM25Okapi
-        except ImportError:
-            return []
-
         # 自动重建
         if self._bm25_dirty or self._bm25 is None:
             self.build_bm25_index()
@@ -196,12 +193,14 @@ class HybridRetriever:
         results: list[dict[str, Any]] = []
         for idx, score in ranked:
             if score > 0:
-                results.append({
-                    "id": self._bm25_docs[idx]["id"],
-                    "text": self._bm25_docs[idx]["text"],
-                    "metadata": self._bm25_docs[idx]["metadata"],
-                    "score": float(score),
-                })
+                results.append(
+                    {
+                        "id": self._bm25_docs[idx]["id"],
+                        "text": self._bm25_docs[idx]["text"],
+                        "metadata": self._bm25_docs[idx]["metadata"],
+                        "score": float(score),
+                    }
+                )
 
         return results
 

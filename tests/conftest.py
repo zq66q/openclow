@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 try:
     import pytest
@@ -28,6 +29,7 @@ if pytest is not None:
         d = tempfile.mkdtemp(prefix="openclaw_test_")
         yield d
         import shutil
+
         shutil.rmtree(d, ignore_errors=True)
 
     @pytest.fixture
@@ -53,7 +55,7 @@ if pytest is not None:
     @pytest.fixture
     def tmp_facade(test_db_dir: str) -> Generator[Any, None, None]:
         """临时 ServiceFacade 实例。"""
-        from business.service_facade import ServiceFacade, ServiceConfig
+        from business.service_facade import ServiceConfig, ServiceFacade
 
         config = ServiceConfig(
             llm_api_key="mock",
@@ -83,6 +85,7 @@ if pytest is not None:
 
 
 # ── 独立辅助函数（无 pytest 时也可用） ──
+
 
 def create_mock_llm() -> Any:
     """创建 Mock LLM（独立函数，不依赖 pytest）。"""

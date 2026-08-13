@@ -8,9 +8,8 @@
 
 from __future__ import annotations
 
-import time
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from core.logger import logger
 
@@ -83,7 +82,7 @@ class ContextBuilder:
             "回复时请使用以下格式：\n\n"
             "Thought: 你的思考过程\n"
             "Action: 工具名\n"
-            "Action Input: {\"参数名\": \"参数值\"}\n\n"
+            'Action Input: {"参数名": "参数值"}\n\n'
             "调用工具后你会收到 Observation，然后继续思考下一步……\n"
             "当你准备好回答用户时，使用：\n"
             "Final Answer: 你的最终回答\n\n"
@@ -144,10 +143,7 @@ class ContextBuilder:
         estimated_tokens = ContextBuilder._estimate_tokens(messages)
 
         if estimated_tokens > max_tokens:
-            logger.warning(
-                f"ContextBuilder: 预估 token ({estimated_tokens}) 超过预算 ({max_tokens}), "
-                "将截断历史消息"
-            )
+            logger.warning(f"ContextBuilder: 预估 token ({estimated_tokens}) 超过预算 ({max_tokens}), 将截断历史消息")
             messages = ContextBuilder._truncate_to_budget(messages, max_tokens)
 
         return messages
@@ -178,9 +174,7 @@ class ContextBuilder:
         return total_chars // 3  # 英文 ~4 chars/token
 
     @staticmethod
-    def _truncate_to_budget(
-        messages: list[dict[str, Any]], max_tokens: int
-    ) -> list[dict[str, Any]]:
+    def _truncate_to_budget(messages: list[dict[str, Any]], max_tokens: int) -> list[dict[str, Any]]:
         """截断消息列表到 token 预算内。优先保留 system + 最近的消息。
 
         多模态消息不再强制保留；当预算不足时，会尝试将其降级为纯文本（只保留文字部分）
@@ -201,9 +195,8 @@ class ContextBuilder:
                 continue
 
             # 预算不足时，如果是多模态消息，尝试降级为纯文本
-            is_multimodal = (
-                isinstance(msg.get("content"), list)
-                and any(item.get("type") == "image_url" for item in msg.get("content", []))
+            is_multimodal = isinstance(msg.get("content"), list) and any(
+                item.get("type") == "image_url" for item in msg.get("content", [])
             )
             if is_multimodal:
                 text_msg = ContextBuilder._downgrade_multimodal_to_text(msg)
@@ -223,9 +216,7 @@ class ContextBuilder:
         content = msg.get("content", "")
         if isinstance(content, list):
             text_parts = [
-                item.get("text", "")
-                for item in content
-                if isinstance(item, dict) and item.get("type") == "text"
+                item.get("text", "") for item in content if isinstance(item, dict) and item.get("type") == "text"
             ]
             text = "\n".join(text_parts).strip()
             return {**msg, "content": text or "[图片消息]"}
@@ -272,17 +263,14 @@ class ContextBuilder:
         compressed: list[dict[str, Any]] = []
         image_count = 0
         for msg in reversed(flattened):
-            is_multimodal = (
-                isinstance(msg.get("content"), list)
-                and any(item.get("type") == "image_url" for item in msg.get("content", []))
+            is_multimodal = isinstance(msg.get("content"), list) and any(
+                item.get("type") == "image_url" for item in msg.get("content", [])
             )
             if is_multimodal:
                 image_count += 1
                 if image_count > max_image_history:
                     msg = ContextBuilder._downgrade_multimodal_to_text(msg)
-                    logger.debug(
-                        f"ContextBuilder: 历史图片超过 {max_image_history} 张，降级为文本"
-                    )
+                    logger.debug(f"ContextBuilder: 历史图片超过 {max_image_history} 张，降级为文本")
             compressed.insert(0, msg)
 
         return compressed

@@ -58,13 +58,14 @@ if pytest is not None:
             class _FakeEmbed:
                 def embed_batch(self, texts, **kwargs):
                     return [[0.0] * 128 for _ in texts], {"total_tokens": 0, "batch_count": 1}
+
                 def embed(self, text, **kwargs):
                     return [0.0] * 128, {"total_tokens": 0}
 
-            if hasattr(tmp_facade._rag_pipeline, 'embed_client'):
+            if hasattr(tmp_facade._rag_pipeline, "embed_client"):
                 tmp_facade._rag_pipeline.embed_client = _FakeEmbed()
                 tmp_facade._rag_pipeline.retriever.embed_client = _FakeEmbed()
-            if hasattr(tmp_facade, '_embed_client'):
+            if hasattr(tmp_facade, "_embed_client"):
                 tmp_facade._embed_client = _FakeEmbed()
 
             doc = tmp_path / "test_doc.txt"

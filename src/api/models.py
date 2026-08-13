@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
-
+from typing import Any
 
 try:
     from pydantic import BaseModel, Field
@@ -34,7 +33,7 @@ class HealthResponse(BaseModel):
 class ChatRequest(BaseModel):
     query: str = Field(..., description="用户消息")
     scenario: str = Field(default="general_assistant", description="场景类型")
-    session_id: Optional[str] = Field(default=None, description="会话 ID")
+    session_id: str | None = Field(default=None, description="会话 ID")
     stream: bool = Field(default=False, description="是否流式")
 
 

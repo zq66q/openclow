@@ -33,15 +33,12 @@ from __future__ import annotations
 import json
 import os
 import time
-import traceback
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from core.logger import logger
-
 
 # ── 数据类型 ──
 
@@ -106,6 +103,7 @@ class ServiceConfig:
         if p.suffix in (".yaml", ".yml"):
             try:
                 import yaml
+
                 data = yaml.safe_load(content) or {}
             except ImportError:
                 data = json.loads(content)
@@ -237,9 +235,7 @@ class ServiceFacade:
     @classmethod
     def from_config(cls, config_path: str) -> ServiceFacade:
         """从配置文件创建服务。"""
-        config = ServiceConfig.from_file(config_path)
-        config = ServiceConfig.from_env()  # 环境变量覆盖
-        # 重新加载文件并合并
+        # 重新加载文件并合并，环境变量覆盖文件配置
         file_config = ServiceConfig.from_file(config_path)
         env_config = ServiceConfig.from_env()
         merged = _merge_configs(file_config, env_config)
@@ -263,10 +259,7 @@ class ServiceFacade:
         errors: list[str] = []
 
         # L1 - LLM Client
-        try:
-            from core.llm_client import BaseLLMClient, OpenAIClient
-        except ImportError:
-            from core.llm_client import BaseLLMClient
+        from core.llm_client import OpenAIClient
 
         try:
             if self.config.llm_api_key:
@@ -307,10 +300,12 @@ class ServiceFacade:
         # L2 - Embedding Client
         try:
             from core.embedding_client import EmbeddingClient
+
             embed_api_key = self.config.embed_api_key or self.config.llm_api_key
             if embed_api_key:
                 try:
                     from openai import OpenAI
+
                     embed_openai = OpenAI(
                         api_key=embed_api_key,
                         base_url=self.config.embed_base_url or self.config.llm_base_url or "https://api.openai.com/v1",
@@ -330,6 +325,7 @@ class ServiceFacade:
         try:
             from rag.pipeline import RAGPipeline
             from rag.vector_store import VectorStore
+
             self._rag_pipeline = RAGPipeline(
                 collection_name="default",
                 embed_client=self._embed_client,
@@ -348,6 +344,7 @@ class ServiceFacade:
         try:
             from memory.db import MemoryDB
             from memory.memory_manager import MemoryManager
+
             self._memory_db = MemoryDB(db_path=self.config.memory_db_path)
             self._memory_manager = MemoryManager(
                 user_id=self.config.default_user_id,
@@ -362,6 +359,7 @@ class ServiceFacade:
         # L5 - Agent Observability & Cost
         try:
             from agent.observability import get_observability
+
             self._observability = get_observability()
             self._components["observability"] = "ok"
         except Exception as exc:
@@ -371,6 +369,7 @@ class ServiceFacade:
 
         try:
             from agent.cost_tracker import CostTracker
+
             self._cost_tracker = CostTracker(
                 session_id="service",
                 budget_usd=self.config.budget_usd,
@@ -385,6 +384,7 @@ class ServiceFacade:
         # L6 - Session Manager
         try:
             from business.session import SessionManager
+
             self._session_manager = SessionManager(db=self._memory_db)
             self._components["session"] = "ok"
         except Exception as exc:
@@ -395,6 +395,7 @@ class ServiceFacade:
         # Agent State Store
         try:
             from agent.state_store import StateStore
+
             self._state_store = StateStore(store_path=self.config.state_db_path)
             self._components["state_store"] = "ok"
         except Exception as exc:
@@ -542,7 +543,9 @@ class ServiceFacade:
         builder = ScenarioBuilder
         method = getattr(builder, scenario_type, None)
         if method is None:
-            raise ValueError(f"未知场景类型: {scenario_type}，支持: general_assistant, rag_customer_service, data_analyst, code_reviewer, plan_executor")
+            raise ValueError(
+                f"未知场景类型: {scenario_type}，支持: general_assistant, rag_customer_service, data_analyst, code_reviewer, plan_executor"
+            )
 
         app = method(**kwargs)
 
@@ -599,13 +602,12 @@ class ServiceFacade:
         """
         self._ensure_running()
 
+        from business.presets import PresetAgents
         from business.workflows import (
-            Workflow,
             FlowStep,
-            StepType,
+            Workflow,
             build_parallel_workflow,
         )
-        from business.presets import PresetAgents
 
         if agents is None:
             all_agents = PresetAgents.create_all(
@@ -625,13 +627,23 @@ class ServiceFacade:
         elif workflow_name == "code_review":
             steps = [
                 FlowStep("读取代码", agent_name="code_review", prompt_template="{query}", output_key="code"),
-                FlowStep("审查代码", agent_name="code_review", prompt_template="审查以下代码:\n{code}", depends_on=["读取代码"]),
+                FlowStep(
+                    "审查代码",
+                    agent_name="code_review",
+                    prompt_template="审查以下代码:\n{code}",
+                    depends_on=["读取代码"],
+                ),
             ]
             wf = Workflow("代码审查", steps=steps, agents=agents)
         elif workflow_name == "rag_qa":
             steps = [
                 FlowStep("检索", agent_name="rag_qa", prompt_template="{query}", output_key="context"),
-                FlowStep("回答", agent_name="general", prompt_template="参考上下文回答:\n{context}\n\n问题: {query}", depends_on=["检索"]),
+                FlowStep(
+                    "回答",
+                    agent_name="general",
+                    prompt_template="参考上下文回答:\n{context}\n\n问题: {query}",
+                    depends_on=["检索"],
+                ),
             ]
             wf = Workflow("知识库问答", steps=steps, agents=agents)
         else:
@@ -768,10 +780,11 @@ class ServiceFacade:
         self._ensure_running()
 
         from concurrent.futures import ThreadPoolExecutor, as_completed
-        from business.presets import PresetAgents
+
         from agent.base import AgentResult
-        from agent.fusion import ResultFusion, FusionStrategy
         from agent.executor import AgentExecutor
+        from agent.fusion import FusionStrategy, ResultFusion
+        from business.presets import PresetAgents
 
         t0 = time.perf_counter()
 
@@ -883,8 +896,8 @@ class ServiceFacade:
         """
         self._ensure_running()
 
-        from business.presets import PresetAgents
         from agent.executor import AgentExecutor
+        from business.presets import PresetAgents
 
         t0 = time.perf_counter()
 
@@ -941,10 +954,11 @@ class ServiceFacade:
                 render_event(event)  # 实时更新 UI
         """
         import queue
+
         self._ensure_running()
 
-        from business.presets import PresetAgents
         from agent.executor import AgentExecutor
+        from business.presets import PresetAgents
 
         event_queue: queue.Queue = queue.Queue()
 
@@ -969,6 +983,7 @@ class ServiceFacade:
                 event_queue.put({"type": "_error", "error": str(exc)})
 
         import threading
+
         t = threading.Thread(target=_run_in_thread, daemon=True)
         t.start()
 
@@ -1005,9 +1020,13 @@ class ServiceFacade:
                     "tool_calls_count": result.tool_calls_count,
                     "token_usage": dict(result.token_usage) if result.token_usage else {},
                     "steps": [
-                        {"step_num": s.step_num, "thought": s.thought,
-                         "action": s.action, "action_input": getattr(s, "action_input", None),
-                         "observation": s.observation}
+                        {
+                            "step_num": s.step_num,
+                            "thought": s.thought,
+                            "action": s.action,
+                            "action_input": getattr(s, "action_input", None),
+                            "observation": s.observation,
+                        }
                         for s in result.steps
                     ],
                 }
@@ -1021,6 +1040,7 @@ class ServiceFacade:
     def get_prompt(self, category: str, name: str) -> Any:
         """获取提示词模板。"""
         from business.prompts import PromptLibrary
+
         return PromptLibrary.get(category, name)
 
     # ── 内部 ──

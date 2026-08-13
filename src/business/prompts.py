@@ -331,6 +331,7 @@ class PromptLibrary:
         if p.suffix in (".yaml", ".yml"):
             try:
                 import yaml
+
                 data = yaml.safe_load(content) or []
             except ImportError:
                 data = json.loads(content)
@@ -357,9 +358,8 @@ class PromptLibrary:
                 issues = tpl.validate()
                 if issues:
                     import logging
-                    logging.getLogger(__name__).warning(
-                        f"Template {tpl.name} validation issues: {issues}"
-                    )
+
+                    logging.getLogger(__name__).warning(f"Template {tpl.name} validation issues: {issues}")
                 cls.register(tpl)
                 count += 1
             except Exception:
@@ -425,15 +425,11 @@ class PromptLibrary:
             catalog = getattr(cls, cat_name.upper(), None)
             if catalog:
                 for tpl in catalog.values():
-                    if (kw in tpl.name.lower() or
-                        kw in tpl.description.lower() or
-                        kw in tpl.system_prompt.lower()):
+                    if kw in tpl.name.lower() or kw in tpl.description.lower() or kw in tpl.system_prompt.lower():
                         results.append(tpl)
         # 自定义
         for cat_dict in cls._custom_templates.values():
             for tpl in cat_dict.values():
-                if (kw in tpl.name.lower() or
-                    kw in tpl.description.lower() or
-                    kw in tpl.system_prompt.lower()):
+                if kw in tpl.name.lower() or kw in tpl.description.lower() or kw in tpl.system_prompt.lower():
                     results.append(tpl)
         return results

@@ -58,17 +58,11 @@ class ResponseGenerator:
             Response
         """
         if fmt == ResponseFormat.MARKDOWN:
-            content = ResponseGenerator._to_markdown(
-                result, include_steps, include_tokens
-            )
+            content = ResponseGenerator._to_markdown(result, include_steps, include_tokens)
         elif fmt == ResponseFormat.STRUCTURED:
-            content = ResponseGenerator._to_structured(
-                result, include_steps, include_tokens
-            )
+            content = ResponseGenerator._to_structured(result, include_steps, include_tokens)
         else:
-            content = ResponseGenerator._to_text(
-                result, include_steps, include_tokens
-            )
+            content = ResponseGenerator._to_text(result, include_steps, include_tokens)
 
         return Response(
             content=content,
@@ -99,12 +93,7 @@ class ResponseGenerator:
         if include_steps and result.steps:
             lines.append("\n--- 推理步骤 ---")
             for s in result.steps:
-                lines.append(
-                    f"步骤 {s.step_num}: "
-                    f"Thought={s.thought[:60]}, "
-                    f"Action={s.action}, "
-                    f"{s.elapsed_ms}ms"
-                )
+                lines.append(f"步骤 {s.step_num}: Thought={s.thought[:60]}, Action={s.action}, {s.elapsed_ms}ms")
         if include_tokens:
             lines.append(
                 f"\nToken: {result.token_usage.get('total', 0)} "
@@ -139,9 +128,7 @@ class ResponseGenerator:
 
         if include_tokens:
             lines.append("\n---")
-            lines.append(
-                f"*Token 用量: {result.token_usage.get('total', 0)}*"
-            )
+            lines.append(f"*Token 用量: {result.token_usage.get('total', 0)}*")
 
         return "\n".join(lines)
 

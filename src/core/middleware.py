@@ -13,31 +13,32 @@ from __future__ import annotations
 
 import time
 import uuid
-from abc import ABC, abstractmethod
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from core.exceptions import ToolParamError
-from core.logger import get_trace_id, logger, set_trace_id
-
+from core.logger import logger, set_trace_id
 
 # ------------------------------------------------------------------------------
 # 中间件抽象基类
 # ------------------------------------------------------------------------------
 
-class Middleware(ABC):
-    """单个中间件。"""
+
+class Middleware:
+    """单个中间件。子类必须实现 process()。"""
 
     name: str = ""
 
-    @abstractmethod
     def process(self, request: dict[str, Any]) -> dict[str, Any]:
         """处理请求。返回修改后的 request（或原样返回）。
 
         如需拒绝请求，直接抛出异常。
         """
-        ...
+        raise NotImplementedError("Middleware subclass must implement process()")
 
-    def on_complete(self, request: dict[str, Any], response: dict[str, Any] | None, error: Exception | None = None) -> None:
+    def on_complete(
+        self, request: dict[str, Any], response: dict[str, Any] | None, error: Exception | None = None
+    ) -> None:
         """请求完成后的回调（无论成功/失败都会调用）。子类可覆盖。"""
         pass
 
@@ -45,6 +46,7 @@ class Middleware(ABC):
 # ------------------------------------------------------------------------------
 # 中间件链
 # ------------------------------------------------------------------------------
+
 
 class MiddlewareChain:
     """责任链模式：按顺序执行一组中间件。"""
@@ -98,6 +100,7 @@ class MiddlewareChain:
 # 内置中间件实现
 # ------------------------------------------------------------------------------
 
+
 class TraceIdInjector(Middleware):
     """为每个请求生成/注入 trace_id，贯穿整条调用链。"""
 
@@ -113,7 +116,9 @@ class TraceIdInjector(Middleware):
         logger.info("Request start", extra={"trace_id": tid, "user_id": request.get("user_id")})
         return request
 
-    def on_complete(self, request: dict[str, Any], response: dict[str, Any] | None, error: Exception | None = None) -> None:
+    def on_complete(
+        self, request: dict[str, Any], response: dict[str, Any] | None, error: Exception | None = None
+    ) -> None:
         tid = request.get("trace_id", "unknown")
         status = "error" if error else "success"
         logger.info(f"Request {status}", extra={"trace_id": tid})
@@ -186,7 +191,9 @@ class AuditLogger(Middleware):
         request["_audit_start"] = audit_entry
         return request
 
-    def on_complete(self, request: dict[str, Any], response: dict[str, Any] | None, error: Exception | None = None) -> None:
+    def on_complete(
+        self, request: dict[str, Any], response: dict[str, Any] | None, error: Exception | None = None
+    ) -> None:
         start_entry = request.get("_audit_start", {})
         start_entry["status"] = "error" if error else "success"
         if error:
@@ -199,18 +206,13 @@ class AuditLogger(Middleware):
 # 默认中间件链工厂
 # ------------------------------------------------------------------------------
 
+
 def build_default_chain() -> MiddlewareChain:
     """构建 OpenClaw 默认中间件链。
 
     顺序：trace_id → 参数校验 → 权限检查 → 审计日志
     """
-    return (
-        MiddlewareChain()
-        .add(TraceIdInjector())
-        .add(ParamValidator())
-        .add(PermissionCheck())
-        .add(AuditLogger())
-    )
+    return MiddlewareChain().add(TraceIdInjector()).add(ParamValidator()).add(PermissionCheck()).add(AuditLogger())
 
 
 # 全局默认实例（懒加载复用）
@@ -229,10 +231,10 @@ def get_middleware_chain() -> MiddlewareChain:
 # 便捷函数：一行代码跑完整中间件 + handler
 # ------------------------------------------------------------------------------
 
+
 def process_request(
     request: dict[str, Any],
     handler: Callable[[dict[str, Any]], dict[str, Any]],
 ) -> dict[str, Any]:
     """使用默认中间件链处理请求并执行 handler。"""
     return get_middleware_chain().run_with_cleanup(request, handler)
-

@@ -77,10 +77,12 @@ class StateStore:
         for f in sorted(self._base_path.glob("context_*.json"), reverse=True):
             data = self._read_json(f.name)
             if data:
-                sessions.append({
-                    "session_id": data.get("session_id", f.stem.replace("context_", "")),
-                    "created_at": data.get("created_at", 0),
-                })
+                sessions.append(
+                    {
+                        "session_id": data.get("session_id", f.stem.replace("context_", "")),
+                        "created_at": data.get("created_at", 0),
+                    }
+                )
             if len(sessions) >= limit:
                 break
         return sessions
@@ -95,7 +97,9 @@ class StateStore:
             "session_id": session_id,
             "step_id": getattr(step, "step_id", ""),
             "agent_name": getattr(step, "agent_name", ""),
-            "status": getattr(step, "status", "pending").value if hasattr(getattr(step, "status", "pending"), "value") else str(getattr(step, "status", "pending")),
+            "status": getattr(step, "status", "pending").value
+            if hasattr(getattr(step, "status", "pending"), "value")
+            else str(getattr(step, "status", "pending")),
             "result": getattr(step, "result", {}),
             "started_at": getattr(step, "started_at", 0),
             "finished_at": getattr(step, "finished_at", 0),
@@ -165,9 +169,7 @@ class StateStore:
 
     def _load_context_sqlite(self, sid: str) -> dict | None:
         conn = sqlite3.connect(str(self._db_path))
-        row = conn.execute(
-            "SELECT data_json FROM contexts WHERE session_id = ?", (sid,)
-        ).fetchone()
+        row = conn.execute("SELECT data_json FROM contexts WHERE session_id = ?", (sid,)).fetchone()
         conn.close()
         return json.loads(row[0]) if row else None
 
@@ -229,6 +231,7 @@ class StateStore:
 # 序列化辅助
 # ------------------------------------------------------------------
 
+
 def _serialize_context(ctx: Any) -> dict[str, Any]:
     """将 AgentContext 或兼容对象序列化为 dict。"""
     if hasattr(ctx, "snapshot"):
@@ -244,4 +247,5 @@ def _serialize_context(ctx: Any) -> dict[str, Any]:
 
 def _generate_id() -> str:
     import uuid
+
     return uuid.uuid4().hex[:12]

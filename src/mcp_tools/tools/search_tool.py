@@ -9,10 +9,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from mcp_tools.base import Tool, ToolMeta, ToolDangerLevel
+from mcp_tools.base import Tool, ToolDangerLevel, ToolMeta
 from mcp_tools.registry import register_tool
 from mcp_tools.tools.http_tool import http_request
-
 
 _TAVILY_URL = "https://api.tavily.com/search"
 
@@ -63,21 +62,22 @@ class WebSearchTool(Tool):
 
         # 从 settings 获取 API Key
         from core.settings import settings
+
         api_key = settings.tavily_api_key
         if not api_key:
-            raise RuntimeError(
-                "Tavily API Key 未配置，请在 .env 中设置 TAVILY_API_KEY"
-            )
+            raise RuntimeError("Tavily API Key 未配置，请在 .env 中设置 TAVILY_API_KEY")
 
         # 构建请求体
-        payload = json.dumps({
-            "api_key": api_key,
-            "query": query,
-            "max_results": max_results,
-            "search_depth": search_depth,
-            "include_answer": True,
-            "include_raw_content": False,
-        })
+        payload = json.dumps(
+            {
+                "api_key": api_key,
+                "query": query,
+                "max_results": max_results,
+                "search_depth": search_depth,
+                "include_answer": True,
+                "include_raw_content": False,
+            }
+        )
 
         # 发送请求
         resp = http_request(
@@ -105,11 +105,13 @@ class WebSearchTool(Tool):
 
         results = []
         for item in results_raw[:max_results]:
-            results.append({
-                "title": item.get("title", ""),
-                "url": item.get("url", ""),
-                "content": item.get("content", "")[:500],  # 截断过长的内容
-            })
+            results.append(
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "content": item.get("content", "")[:500],  # 截断过长的内容
+                }
+            )
 
         return {
             "query": query,

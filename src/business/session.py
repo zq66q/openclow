@@ -18,11 +18,9 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from threading import Lock
 from typing import Any
 
 from memory.db import MemoryDB
-
 
 # ── 多会话 SQLite 表标准 ──
 
@@ -237,8 +235,7 @@ class SessionManager:
                     """UPDATE business_sessions
                        SET messages = json_insert(messages, '$[#]', json(?)), updated_at = ?
                        WHERE session_id = ?""",
-                    (json.dumps({"role": role, "content": content}, ensure_ascii=False),
-                     now, session_id),
+                    (json.dumps({"role": role, "content": content}, ensure_ascii=False), now, session_id),
                 )
                 conn.commit()
                 return True
@@ -408,10 +405,14 @@ class SessionManager:
                    (session_id, user_id, title, messages, metadata, status, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    session.session_id, session.user_id, session.title,
+                    session.session_id,
+                    session.user_id,
+                    session.title,
                     json.dumps(session.messages, ensure_ascii=False),
                     json.dumps(session.metadata, ensure_ascii=False),
-                    session.status, session.created_at, session.updated_at,
+                    session.status,
+                    session.created_at,
+                    session.updated_at,
                 ),
             )
             conn.commit()
@@ -428,22 +429,16 @@ class SessionManager:
             where = "WHERE user_id = ?" if user_id else ""
             params: list[Any] = [user_id] if user_id else []
 
-            total = conn.execute(
-                f"SELECT COUNT(*) FROM business_sessions {where}", params
-            ).fetchone()[0]
+            total = conn.execute(f"SELECT COUNT(*) FROM business_sessions {where}", params).fetchone()[0]
 
             by_status = {}
             for status in ("active", "archived", "closed"):
                 p2 = params + [status]
                 where2 = f"{where} {'AND' if where else 'WHERE'} status = ?"
-                by_status[status] = conn.execute(
-                    f"SELECT COUNT(*) FROM business_sessions {where2}", p2
-                ).fetchone()[0]
+                by_status[status] = conn.execute(f"SELECT COUNT(*) FROM business_sessions {where2}", p2).fetchone()[0]
 
             # 总消息数
-            rows = conn.execute(
-                f"SELECT messages FROM business_sessions {where}", params
-            ).fetchall()
+            rows = conn.execute(f"SELECT messages FROM business_sessions {where}", params).fetchall()
             total_msgs = sum(len(json.loads(r["messages"])) for r in rows)
 
         return {
@@ -457,9 +452,7 @@ class SessionManager:
     def _list_all(self) -> list[Session]:
         """列出所有会话（内部使用）。"""
         with self._db.get_conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM business_sessions ORDER BY updated_at DESC"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM business_sessions ORDER BY updated_at DESC").fetchall()
         return [Session.from_row(r) for r in rows]
 
     # ── 上下文组装 ──

@@ -9,11 +9,11 @@
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from mcp_tools.base import Tool, ToolMeta, ToolDangerLevel
-from mcp_tools.registry import register_tool
 from core.logger import logger
+from mcp_tools.base import Tool, ToolDangerLevel, ToolMeta
+from mcp_tools.registry import register_tool
 
 if TYPE_CHECKING:
     from agent.base import BaseAgent
@@ -93,8 +93,7 @@ class DelegateTaskTool(Tool):
             "task": {
                 "type": "string",
                 "description": (
-                    "要委派给该专家的具体任务描述。请用自然语言详细描述，"
-                    "包括所有必要的上下文、数据和约束条件。"
+                    "要委派给该专家的具体任务描述。请用自然语言详细描述，包括所有必要的上下文、数据和约束条件。"
                 ),
             },
         },
@@ -111,14 +110,15 @@ class DelegateTaskTool(Tool):
         agent = _sub_agents.get(agent_name)
         if agent is None:
             available = list(_sub_agents.keys())
-            return self._format_result({
-                "agent_name": agent_name,
-                "success": False,
-                "error": (
-                    f"未找到 Agent '{agent_name}'。"
-                    f"当前可用的专家: {', '.join(available) if available else '无'}"
-                ),
-            })
+            return self._format_result(
+                {
+                    "agent_name": agent_name,
+                    "success": False,
+                    "error": (
+                        f"未找到 Agent '{agent_name}'。当前可用的专家: {', '.join(available) if available else '无'}"
+                    ),
+                }
+            )
 
         logger.info(
             f"DelegateTask: {agent_name} ← {task[:100]}",

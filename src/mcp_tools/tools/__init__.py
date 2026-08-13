@@ -6,5 +6,5 @@
 新加工具时在此 import 即可被全局注册中心发现。
 """
 
-from . import file_tools, search_tool, orchestrator_tool  # noqa: F401
+from . import file_tools, orchestrator_tool, search_tool  # noqa: F401
 # http_tool 是内部共用模块，不做 Tool 注册

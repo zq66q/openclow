@@ -1,4 +1,4 @@
-#命令行入口，支持 serve/check/ingest/key/token 命令
+# 命令行入口，支持 serve/check/ingest/key/token 命令
 
 """CLI 入口 — 生产级命令行工具。
 
@@ -30,12 +30,10 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import os
 import sys
-import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
 
 # 确保 src 在路径中
 _PROJECT_ROOT = Path(__file__).resolve().parent
@@ -44,8 +42,6 @@ if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-
-from core.logger import logger
 
 
 def _print(msg: str) -> None:
@@ -79,7 +75,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
     from api.server import start
 
     _print(f"\nStarting OpenClaw API on {args.host}:{args.port}")
-    _print(f"Press Ctrl+C to stop\n")
+    _print("Press Ctrl+C to stop\n")
 
     try:
         start(host=args.host, port=args.port, reload=args.reload, facade=facade)
@@ -95,8 +91,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
 
 def cmd_check(args: argparse.Namespace) -> int:
     """运行健康检查。"""
-    import urllib.request
     import json
+    import urllib.request
 
     url = args.url.rstrip("/") + "/health"
     _print(f"Checking {url} ...")

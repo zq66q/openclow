@@ -1,4 +1,4 @@
-#FastAPI 服务器主入口
+# FastAPI 服务器主入口
 
 """FastAPI 后端服务 — 提供 RESTful API + SSE + WebSocket 流式接口。
 
@@ -28,7 +28,8 @@ import asyncio
 import json
 import os
 import time
-from typing import Any, Optional
+from contextlib import suppress
+from typing import Any
 
 from core.logger import logger
 
@@ -46,7 +47,7 @@ _HAS_FASTAPI = False
 _HAS_UVICORN = False
 
 try:
-    from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+    from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
 
     _HAS_FASTAPI = True
@@ -55,6 +56,7 @@ except ImportError:
 
 try:
     import uvicorn
+
     _HAS_UVICORN = True
 except ImportError:
     uvicorn = None  # type: ignore[assignment]
@@ -71,7 +73,7 @@ def get_facade() -> Any:
     """获取 ServiceFacade 实例，自动启动。"""
     global _facade
     if _facade is None:
-        from business.service_facade import ServiceFacade, ServiceConfig
+        from business.service_facade import ServiceConfig, ServiceFacade
 
         config = ServiceConfig.from_env()
         if not config.llm_api_key:
@@ -112,8 +114,9 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
     _auth_mode = os.getenv("OPENCLAW_AUTH_MODE", "apikey").strip().lower()
     if _auth_mode != "none":
         try:
-            from auth.middleware import auth_guard
             from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+
+            from auth.middleware import auth_guard
 
             class AuthMiddleware(BaseHTTPMiddleware):
                 async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Any:
@@ -124,6 +127,7 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
                         auth_guard(request)
                     except Exception:
                         from starlette.responses import JSONResponse
+
                         return JSONResponse(
                             status_code=401,
                             content={"detail": "Authentication required"},
@@ -150,10 +154,10 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
     # ── 注册路由模块 ──
 
     from api.routes.chat import router as chat_router
-    from api.routes.sessions import router as sessions_router
-    from api.routes.rag import router as rag_router
-    from api.routes.workflow import router as workflow_router
     from api.routes.dashboard import router as dashboard_router
+    from api.routes.rag import router as rag_router
+    from api.routes.sessions import router as sessions_router
+    from api.routes.workflow import router as workflow_router
 
     _app.include_router(chat_router)
     _app.include_router(sessions_router)
@@ -178,7 +182,7 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
 
     # ── WebSocket 流式对话 ──
 
-    _HEARTBEAT_INTERVAL = 30.0   # 秒
+    _HEARTBEAT_INTERVAL = 30.0  # 秒
     _WS_MAX_MESSAGE_SIZE = 65536  # 64KB
 
     @_app.websocket("/chat/ws")
@@ -204,6 +208,7 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
         if auth_mode != "none":
             try:
                 from auth.middleware import APIKeyAuth, JWTAuth
+
                 api_auth = APIKeyAuth()
                 jwt_auth = JWTAuth()
                 headers = dict(websocket.headers)
@@ -218,11 +223,10 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
                         await websocket.send_json({"type": "error", "message": "JWT authentication required"})
                         await websocket.close(code=4001, reason="Unauthorized")
                         return
-                elif auth_mode == "both":
-                    if not (api_auth.verify(headers) or jwt_auth.verify(headers)):
-                        await websocket.send_json({"type": "error", "message": "Authentication required"})
-                        await websocket.close(code=4001, reason="Unauthorized")
-                        return
+                elif auth_mode == "both" and not (api_auth.verify(headers) or jwt_auth.verify(headers)):
+                    await websocket.send_json({"type": "error", "message": "Authentication required"})
+                    await websocket.close(code=4001, reason="Unauthorized")
+                    return
             except Exception as exc:
                 logger.warning(f"WS auth error: {exc}")
                 await websocket.send_json({"type": "error", "message": f"Auth error: {exc}"})
@@ -230,16 +234,18 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
                 return
 
         # 发送连接确认
-        await websocket.send_json({
-            "type": "connected",
-            "scenarios": [
-                "general_assistant",
-                "rag_customer_service",
-                "data_analyst",
-                "code_reviewer",
-            ],
-            "auth_mode": auth_mode,
-        })
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "scenarios": [
+                    "general_assistant",
+                    "rag_customer_service",
+                    "data_analyst",
+                    "code_reviewer",
+                ],
+                "auth_mode": auth_mode,
+            }
+        )
 
         # 心跳任务
         heartbeat_running = True
@@ -316,11 +322,13 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
                         try:
                             async for token in llm.astream_chat(messages):
                                 full_answer_parts.append(token)
-                                await websocket.send_json({
-                                    "type": "chunk",
-                                    "content": token,
-                                    "index": chunk_index,
-                                })
+                                await websocket.send_json(
+                                    {
+                                        "type": "chunk",
+                                        "content": token,
+                                        "index": chunk_index,
+                                    }
+                                )
                                 chunk_index += 1
                         except NotImplementedError:
                             can_stream = False
@@ -329,36 +337,44 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
                             full_answer = "".join(full_answer_parts)
                             app.session_manager.append_message(session.session_id, "assistant", full_answer)
                             elapsed_ms = (time.time() - t0) * 1000
-                            await websocket.send_json({
-                                "type": "done",
-                                "session_id": session.session_id,
-                                "elapsed_ms": round(elapsed_ms, 1),
-                                "total_chunks": chunk_index,
-                            })
+                            await websocket.send_json(
+                                {
+                                    "type": "done",
+                                    "session_id": session.session_id,
+                                    "elapsed_ms": round(elapsed_ms, 1),
+                                    "total_chunks": chunk_index,
+                                }
+                            )
                             continue
 
                     # 非流式模式
                     answer = app.chat(query, session_id=session_id)
                     elapsed_ms = (time.time() - t0) * 1000
 
-                    await websocket.send_json({
-                        "type": "chunk",
-                        "content": answer,
-                        "index": 0,
-                    })
-                    await websocket.send_json({
-                        "type": "done",
-                        "session_id": session_id or "auto",
-                        "elapsed_ms": round(elapsed_ms, 1),
-                        "total_chunks": 1,
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "chunk",
+                            "content": answer,
+                            "index": 0,
+                        }
+                    )
+                    await websocket.send_json(
+                        {
+                            "type": "done",
+                            "session_id": session_id or "auto",
+                            "elapsed_ms": round(elapsed_ms, 1),
+                            "total_chunks": 1,
+                        }
+                    )
 
                 except Exception as exc:
                     logger.error(f"WebSocket chat error: {exc}")
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": str(exc),
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "message": str(exc),
+                        }
+                    )
 
         except WebSocketDisconnect:
             logger.info("WebSocket client disconnected")
@@ -367,10 +383,8 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
         finally:
             heartbeat_running = False
             heartbeat_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await heartbeat_task
-            except asyncio.CancelledError:
-                pass
 
     return _app
 

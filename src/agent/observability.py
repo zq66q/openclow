@@ -16,7 +16,6 @@ from typing import Any
 
 from core.logger import logger
 
-
 # 追踪上下文
 _trace_span: ContextVar[str] = ContextVar("trace_span", default="")
 
@@ -136,10 +135,7 @@ class AgentObservability:
         """获取全局汇总指标。"""
         with self._lock:
             total_calls = sum(m.total_calls for m in self._metrics.values())
-            total_tokens = sum(
-                m.total_prompt_tokens + m.total_completion_tokens
-                for m in self._metrics.values()
-            )
+            total_tokens = sum(m.total_prompt_tokens + m.total_completion_tokens for m in self._metrics.values())
             return {
                 "total_agents": len(self._metrics),
                 "total_calls": total_calls,
@@ -162,6 +158,7 @@ class AgentObservability:
     def start_trace(self, span_name: str, metadata: dict | None = None) -> str:
         """开始一个追踪 span。返回 span_id。"""
         import uuid
+
         span_id = uuid.uuid4().hex[:12]
         self._trace_spans[span_id] = {
             "span_name": span_name,
@@ -181,10 +178,7 @@ class AgentObservability:
             span["status"] = status
             span["error"] = error
             duration_ms = (span["end_time"] - span["start_time"]) * 1000
-            logger.debug(
-                f"Trace [{span_id}] {span['span_name']}: "
-                f"{status} ({duration_ms:.0f}ms)"
-            )
+            logger.debug(f"Trace [{span_id}] {span['span_name']}: {status} ({duration_ms:.0f}ms)")
 
     def get_traces(self, limit: int = 20) -> list[dict[str, Any]]:
         """获取最近的追踪记录。"""
@@ -210,9 +204,7 @@ class AgentObservability:
             for name, m in self._metrics.items():
                 if m.error_calls > 0 and m.success_rate < 0.5:
                     checks[f"agent:{name}"] = False
-                    details[f"agent:{name}"] = (
-                        f"成功率过低: {m.success_rate:.0%}"
-                    )
+                    details[f"agent:{name}"] = f"成功率过低: {m.success_rate:.0%}"
                     status.healthy = False
                 else:
                     checks[f"agent:{name}"] = True

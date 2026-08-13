@@ -24,16 +24,16 @@ from __future__ import annotations
 
 import json
 import time
-import traceback
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from threading import Event, Lock
-from typing import Any, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from agent.state import AgentContext
 from agent.executor import AgentExecutor
+from agent.state import AgentContext
 from core.logger import logger
 
 if TYPE_CHECKING:
@@ -42,21 +42,21 @@ if TYPE_CHECKING:
 
 # ── 默认配置 ──
 
-DEFAULT_STEP_TIMEOUT = 120       # 单步默认超时（秒）
-DEFAULT_WORKFLOW_TIMEOUT = 600   # 工作流整体默认超时（秒）
-BACKOFF_BASE = 1.0               # 退避基础（秒）
-BACKOFF_MULTIPLIER = 2.0         # 退避倍率
-BACKOFF_MAX = 30.0               # 退避上限（秒）
+DEFAULT_STEP_TIMEOUT = 120  # 单步默认超时（秒）
+DEFAULT_WORKFLOW_TIMEOUT = 600  # 工作流整体默认超时（秒）
+BACKOFF_BASE = 1.0  # 退避基础（秒）
+BACKOFF_MULTIPLIER = 2.0  # 退避倍率
+BACKOFF_MAX = 30.0  # 退避上限（秒）
 
 
 # ── 步骤类型 ──
 
 
 class StepType(str, Enum):
-    ACTION = "action"        # 普通 Agent 调用
+    ACTION = "action"  # 普通 Agent 调用
     CONDITION = "condition"  # 条件分支
-    PARALLEL = "parallel"    # 并行执行
-    APPROVAL = "approval"    # 人工审批
+    PARALLEL = "parallel"  # 并行执行
+    APPROVAL = "approval"  # 人工审批
 
 
 @dataclass
@@ -148,7 +148,7 @@ class WorkflowState:
     """工作流执行状态（可持久化），支持跨进程恢复。"""
 
     wf_id: str
-    status: str = "pending"          # pending / running / success / failed / cancelled
+    status: str = "pending"  # pending / running / success / failed / cancelled
     current_step: int = 0
     step_results: list[StepResult] = field(default_factory=list)
     error: str | None = None
@@ -269,18 +269,22 @@ class Workflow:
 
     # ── 状态持久化 ──
 
-    def save_state(self, path: str, query: str = "",
-                   step_results: list[StepResult] | None = None) -> None:
+    def save_state(self, path: str, query: str = "", step_results: list[StepResult] | None = None) -> None:
         """将工作流当前状态保存到 JSON 文件，支持断点续跑。"""
         state = {
             "name": self.name,
             "query": query,
             "step_names": [s.name for s in self.steps],
             "completed": [r.step_name for r in (step_results or []) if r.success],
-            "step_results": [{
-                "step_name": r.step_name, "success": r.success,
-                "output": r.output[:500], "error": r.error,
-            } for r in (step_results or [])],
+            "step_results": [
+                {
+                    "step_name": r.step_name,
+                    "success": r.success,
+                    "output": r.output[:500],
+                    "error": r.error,
+                }
+                for r in (step_results or [])
+            ],
             "timestamp": time.time(),
         }
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -379,8 +383,11 @@ class Workflow:
         final_output = step_results[-1].output if step_results else ""
         elapsed = (time.perf_counter() - t0) * 1000
 
-        ctx.note(source="workflow", event="finish",
-                 detail={"success": all_ok, "steps": len(step_results), "cancelled": self._cancel_event.is_set()})
+        ctx.note(
+            source="workflow",
+            event="finish",
+            detail={"success": all_ok, "steps": len(step_results), "cancelled": self._cancel_event.is_set()},
+        )
 
         return WorkflowResult(
             workflow_name=self.name,
@@ -421,9 +428,16 @@ class Workflow:
         max_retries = step.max_retries if step.max_retries is not None else self.max_step_retries
         step_timeout = step.timeout if step.timeout is not None else self.step_timeout
 
-        ctx.note(source=step.name, event="run",
-                 detail={"agent": step.agent_name, "prompt": injected_prompt[:200],
-                         "max_retries": max_retries, "timeout": step_timeout})
+        ctx.note(
+            source=step.name,
+            event="run",
+            detail={
+                "agent": step.agent_name,
+                "prompt": injected_prompt[:200],
+                "max_retries": max_retries,
+                "timeout": step_timeout,
+            },
+        )
 
         t0 = time.perf_counter()
         last_result = None
@@ -431,7 +445,13 @@ class Workflow:
 
         for attempt in range(max_retries + 1):
             if self._cancel_event.is_set():
-                return StepResult(step_name=step.name, error="已取消", success=False, elapsed_ms=(time.perf_counter() - t0) * 1000, retries=retries)
+                return StepResult(
+                    step_name=step.name,
+                    error="已取消",
+                    success=False,
+                    elapsed_ms=(time.perf_counter() - t0) * 1000,
+                    retries=retries,
+                )
 
             try:
                 result = AgentExecutor.run(agent, injected_prompt)
@@ -440,22 +460,28 @@ class Workflow:
 
             if result.success:
                 elapsed = (time.perf_counter() - t0) * 1000
-                ctx.note(source=step.name, event="done",
-                         detail={"success": True, "output_len": len(result.answer), "retries": retries})
+                ctx.note(
+                    source=step.name,
+                    event="done",
+                    detail={"success": True, "output_len": len(result.answer), "retries": retries},
+                )
                 if step.output_key:
                     ctx.put(step.output_key, result.answer)
                 return StepResult(
-                    step_name=step.name, output=result.answer, success=True,
-                    elapsed_ms=elapsed, retries=retries,
+                    step_name=step.name,
+                    output=result.answer,
+                    success=True,
+                    elapsed_ms=elapsed,
+                    retries=retries,
                 )
 
             last_result = result
             retries += 1
 
             if attempt < max_retries:
-                backoff = min(BACKOFF_BASE * (BACKOFF_MULTIPLIER ** attempt), BACKOFF_MAX)
+                backoff = min(BACKOFF_BASE * (BACKOFF_MULTIPLIER**attempt), BACKOFF_MAX)
                 logger.warning(
-                    f"Workflow step [{step.name}] failed (attempt {attempt+1}/{max_retries+1}), "
+                    f"Workflow step [{step.name}] failed (attempt {attempt + 1}/{max_retries + 1}), "
                     f"retrying in {backoff:.1f}s: {result.error}"
                 )
                 time.sleep(backoff)
@@ -463,12 +489,14 @@ class Workflow:
         elapsed = (time.perf_counter() - t0) * 1000
         error_msg = last_result.error or "未知错误" if last_result else "未知错误"
         output = last_result.answer if last_result and last_result.answer else ""
-        ctx.note(source=step.name, event="done",
-                 detail={"success": False, "error": error_msg, "retries": retries})
+        ctx.note(source=step.name, event="done", detail={"success": False, "error": error_msg, "retries": retries})
         return StepResult(
-            step_name=step.name, output=output, success=False,
+            step_name=step.name,
+            output=output,
+            success=False,
             error=f"重试{max_retries}次后仍失败: {error_msg}",
-            elapsed_ms=elapsed, retries=retries,
+            elapsed_ms=elapsed,
+            retries=retries,
         )
 
     # 兼容旧名
@@ -528,15 +556,19 @@ class Workflow:
                 try:
                     sub_result = fut.result(timeout=10)
                     results_map[sub_name] = {
-                        "name": sub_name, "output": sub_result.output,
-                        "success": sub_result.success, "error": sub_result.error,
+                        "name": sub_name,
+                        "output": sub_result.output,
+                        "success": sub_result.success,
+                        "error": sub_result.error,
                     }
                     if not sub_result.success:
                         all_ok = False
                         logger.warning(f"Workflow parallel sub-step [{sub_name}] failed: {sub_result.error}")
                 except Exception as exc:
                     results_map[sub_name] = {
-                        "name": sub_name, "output": "", "success": False,
+                        "name": sub_name,
+                        "output": "",
+                        "success": False,
                         "error": str(exc),
                     }
                     all_ok = False
@@ -548,15 +580,17 @@ class Workflow:
             if sub_step.name in results_map:
                 ordered_results.append(results_map[sub_step.name])
             else:
-                ordered_results.append({
-                    "name": sub_step.name, "output": "", "success": False,
-                    "error": "未执行（取消或超时）",
-                })
+                ordered_results.append(
+                    {
+                        "name": sub_step.name,
+                        "output": "",
+                        "success": False,
+                        "error": "未执行（取消或超时）",
+                    }
+                )
                 all_ok = False
 
-        combined = "\n\n".join(
-            f"[{r['name']}]: {r['output']}" for r in ordered_results
-        )
+        combined = "\n\n".join(f"[{r['name']}]: {r['output']}" for r in ordered_results)
         elapsed = (time.perf_counter() - t0) * 1000
 
         # 将每个子步骤的结果存入 context
@@ -591,7 +625,7 @@ class Workflow:
 
     def _run_approval(self, step: FlowStep, ctx: AgentContext, query: str) -> StepResult:
         """暂停等待人工审批。"""
-        from agent.human_review import HumanReview, ReviewRequest, ReviewAction
+        from agent.human_review import HumanReview, ReviewAction, ReviewRequest
 
         step_timeout = step.timeout if step.timeout is not None else self.step_timeout
         injected_prompt = self._inject_context(step.prompt_template, ctx, query)
@@ -648,13 +682,15 @@ def build_sequential_workflow(
     """
     steps: list[FlowStep] = []
     for i, aname in enumerate(agent_names):
-        steps.append(FlowStep(
-            name=f"step_{i}",
-            agent_name=aname,
-            prompt_template="{query}" if i == 0 else "上一步结果: {step_%d}" % (i - 1),
-            output_key=f"step_{i}",
-            depends_on=[f"step_{i-1}"] if i > 0 else [],
-        ))
+        steps.append(
+            FlowStep(
+                name=f"step_{i}",
+                agent_name=aname,
+                prompt_template="{query}" if i == 0 else f"上一步结果: {{step_{i - 1}}}",
+                output_key=f"step_{i}",
+                depends_on=[f"step_{i - 1}"] if i > 0 else [],
+            )
+        )
     return Workflow(name=name, steps=steps, agents=agents)
 
 
@@ -673,8 +709,7 @@ def build_parallel_workflow(
         aggregator_agent_name: 用于汇总结果的 Agent 名
     """
     parallel_steps = [
-        FlowStep(name=sn, agent_name=an, prompt_template="{query}", output_key=sn)
-        for sn, an in sub_queries
+        FlowStep(name=sn, agent_name=an, prompt_template="{query}", output_key=sn) for sn, an in sub_queries
     ]
 
     parallel = FlowStep(

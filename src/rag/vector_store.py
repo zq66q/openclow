@@ -1,4 +1,4 @@
-#ChromaDB 向量库封装
+# ChromaDB 向量库封装
 
 """向量存储 — ChromaDB 封装（增强版）。
 
@@ -36,7 +36,7 @@ class VectorStore:
         try:
             import chromadb
         except ImportError:
-            raise ImportError("chromadb 未安装, 请执行: pip install chromadb")
+            raise ImportError("chromadb 未安装, 请执行: pip install chromadb") from None
 
         persist_path = persist_path or settings.rag.vector_store_path
         self._persist_path = persist_path
@@ -85,7 +85,9 @@ class VectorStore:
             metadatas=metadatas,
         )
 
-        logger.info("vector_store add done", extra={"collection": self._name, "count": len(texts), "trace_id": trace_id})
+        logger.info(
+            "vector_store add done", extra={"collection": self._name, "count": len(texts), "trace_id": trace_id}
+        )
         return ids
 
     # ------------------------------------------------------------------
@@ -122,12 +124,14 @@ class VectorStore:
                 distance = results["distances"][0][i] if results["distances"] else 0.0
                 score = 1.0 / (1.0 + distance)
 
-                items.append({
-                    "id": doc_id,
-                    "text": results["documents"][0][i] if results["documents"] else "",
-                    "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
-                    "score": round(score, 4),
-                })
+                items.append(
+                    {
+                        "id": doc_id,
+                        "text": results["documents"][0][i] if results["documents"] else "",
+                        "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
+                        "score": round(score, 4),
+                    }
+                )
 
         logger.info("vector_search done", extra={"found": len(items), "trace_id": trace_id})
         return items
@@ -157,7 +161,6 @@ class VectorStore:
 
         # ChromaDB get 不支持 offset/limit，一次性加载后切片
         # 对于超大集合用 include offset/limit 的变通方案
-        end = min(offset + limit, total)
         results = self._collection.get(
             limit=limit,
             offset=offset,
@@ -167,11 +170,13 @@ class VectorStore:
         items: list[dict[str, Any]] = []
         if results["ids"]:
             for i, doc_id in enumerate(results["ids"]):
-                items.append({
-                    "id": doc_id,
-                    "text": results["documents"][i] if results["documents"] else "",
-                    "metadata": results["metadatas"][i] if results["metadatas"] else {},
-                })
+                items.append(
+                    {
+                        "id": doc_id,
+                        "text": results["documents"][i] if results["documents"] else "",
+                        "metadata": results["metadatas"][i] if results["metadatas"] else {},
+                    }
+                )
         return items
 
     def get_all_documents(self) -> list[dict[str, Any]]:
@@ -192,11 +197,13 @@ class VectorStore:
         items: list[dict[str, Any]] = []
         if results["ids"]:
             for i, doc_id in enumerate(results["ids"]):
-                items.append({
-                    "id": doc_id,
-                    "text": results["documents"][i] if results["documents"] else "",
-                    "metadata": results["metadatas"][i] if results["metadatas"] else {},
-                })
+                items.append(
+                    {
+                        "id": doc_id,
+                        "text": results["documents"][i] if results["documents"] else "",
+                        "metadata": results["metadatas"][i] if results["metadatas"] else {},
+                    }
+                )
         return items
 
     # ------------------------------------------------------------------
@@ -223,7 +230,9 @@ class VectorStore:
         self._collection.delete(where=op_where)
         after = self.count()
         deleted = before - after
-        logger.info("vector_store delete by metadata", extra={"collection": self._name, "deleted": deleted, "where": op_where})
+        logger.info(
+            "vector_store delete by metadata", extra={"collection": self._name, "deleted": deleted, "where": op_where}
+        )
         return deleted
 
     def delete_collection(self) -> None:
@@ -288,7 +297,7 @@ class VectorStore:
         backup_path: str | Path,
         collection_name: str,
         target_persist_path: str | None = None,
-    ) -> "VectorStore":
+    ) -> VectorStore:
         """从备份恢复到新的 VectorStore 实例。
 
         Args:

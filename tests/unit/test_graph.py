@@ -5,8 +5,8 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 
 # 确保 src 在 path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
@@ -17,6 +17,7 @@ import pytest
 def _is_langgraph_available() -> bool:
     try:
         import langgraph  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -27,7 +28,7 @@ class TestBuildGraph:
 
     def test_build_graph_returns_stub_without_langgraph(self):
         """无 LangGraph 时返回 _StubGraph。"""
-        from agent.graph import build_graph, _StubGraph
+        from agent.graph import _StubGraph, build_graph
 
         graph = build_graph()
         assert isinstance(graph, _StubGraph) or hasattr(graph, "invoke")
@@ -77,6 +78,7 @@ class TestBuildGraph:
     def test_stub_ainvoke(self):
         """异步 invoke。"""
         import asyncio
+
         from agent.graph import _StubGraph
 
         graph = _StubGraph()
@@ -98,7 +100,6 @@ class TestBuildGraph:
 
     def test_state_fields(self):
         """OpenClawState 包含必要字段。"""
-        from agent.graph import OpenClawState
 
         # 构造一个 state
         state: dict = {
@@ -116,6 +117,7 @@ class TestBuildGraph:
     def test_end_constant(self):
         """END 常量存在。"""
         from agent.graph import END
+
         assert END is not None
 
 

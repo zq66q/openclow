@@ -1,4 +1,4 @@
-#RAG 流水线，一站式入库/查询
+# RAG 流水线，一站式入库/查询
 
 """RAG 编排流水线 — 一站式入库/查询接口（增强版 v2）。
 
@@ -13,12 +13,12 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from core.embedding_client import EmbeddingClient
 from core.logger import get_trace_id, logger
-from core.settings import settings
 from rag.chunker import CodeChunker, MarkdownChunker, TextChunker
 from rag.retriever import HybridRetriever
 from rag.vector_store import VectorStore
@@ -95,8 +95,7 @@ class RAGPipeline:
                 deleted = self.vector_store.delete_by_metadata({"source": source})
                 if deleted > 0:
                     logger.info(
-                        "ingest: removed old chunks", 
-                        extra={"source": source, "deleted": deleted, "trace_id": trace_id}
+                        "ingest: removed old chunks", extra={"source": source, "deleted": deleted, "trace_id": trace_id}
                     )
                 self._fingerprints[source] = fingerprint
                 # BM25 索引变脏
@@ -129,7 +128,12 @@ class RAGPipeline:
 
         logger.info(
             "ingest complete",
-            extra={"total_chunks": len(chunks), "tokens": embed_stats["total_tokens"], "source": source, "trace_id": trace_id},
+            extra={
+                "total_chunks": len(chunks),
+                "tokens": embed_stats["total_tokens"],
+                "source": source,
+                "trace_id": trace_id,
+            },
         )
         return {
             "chunks": len(chunks),
@@ -201,19 +205,39 @@ class RAGPipeline:
             raise ValueError(f"不是目录: {dir_path}")
 
         # 收集文件
-        if recursive:
-            all_files = list(dir_path.rglob("*"))
-        else:
-            all_files = list(dir_path.glob("*"))
+        all_files = list(dir_path.rglob("*")) if recursive else list(dir_path.glob("*"))
 
         # 过滤：只保留支持的文件类型
         supported = {
-            ".pdf", ".docx", ".doc", ".pptx", ".ppt",
-            ".xlsx", ".xls", ".xlsm", ".csv", ".tsv",
-            ".html", ".htm", ".md", ".markdown", ".txt",
-            ".log", ".json", ".xml", ".yaml", ".yml",
-            ".py", ".js", ".ts", ".java", ".go", ".rs",
-            ".cpp", ".c", ".h",
+            ".pdf",
+            ".docx",
+            ".doc",
+            ".pptx",
+            ".ppt",
+            ".xlsx",
+            ".xls",
+            ".xlsm",
+            ".csv",
+            ".tsv",
+            ".html",
+            ".htm",
+            ".md",
+            ".markdown",
+            ".txt",
+            ".log",
+            ".json",
+            ".xml",
+            ".yaml",
+            ".yml",
+            ".py",
+            ".js",
+            ".ts",
+            ".java",
+            ".go",
+            ".rs",
+            ".cpp",
+            ".c",
+            ".h",
         }
         files = [f for f in all_files if f.is_file() and f.suffix.lower() in supported]
 

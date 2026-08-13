@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from agent.base import AgentResult, AgentState, AgentStep
 from core.logger import logger
@@ -54,6 +54,7 @@ class ReActLoop:
 
         if messages is None:
             from agent.context_builder import ContextBuilder
+
             messages = ContextBuilder.build_messages(agent, query, image_data=image_data)
 
         step_timeout = getattr(agent, "step_timeout", ReActLoop.DEFAULT_STEP_TIMEOUT)
@@ -74,9 +75,7 @@ class ReActLoop:
                 else:
                     client = agent.llm_client
                     model = None
-                raw_output, usage = client.chat(
-                    messages, model=model, temperature=agent.temperature
-                )
+                raw_output, usage = client.chat(messages, model=model, temperature=agent.temperature)
                 if usage is not None:
                     total_tokens["prompt"] += getattr(usage, "prompt_tokens", 0)
                     total_tokens["completion"] += getattr(usage, "completion_tokens", 0)
@@ -105,7 +104,8 @@ class ReActLoop:
                         step_callback({"type": "final", "answer": final_answer_text})
                     return AgentResult(
                         answer=final_answer_text,
-                        steps=steps, tool_calls_count=tool_calls_count,
+                        steps=steps,
+                        tool_calls_count=tool_calls_count,
                         loop_type="react",
                         total_elapsed_ms=round((time.perf_counter() - start_time) * 1000, 2),
                         token_usage=total_tokens,
@@ -128,8 +128,15 @@ class ReActLoop:
 
                     # 回调：通知外层"开始思考+调用工具"
                     if step_callback:
-                        step_callback({"type": "think", "step": step_num, "thought": step.thought,
-                                       "action": step.action, "action_input": None})
+                        step_callback(
+                            {
+                                "type": "think",
+                                "step": step_num,
+                                "thought": step.thought,
+                                "action": step.action,
+                                "action_input": None,
+                            }
+                        )
 
                     if isinstance(action_input, re.Match):
                         try:
@@ -141,9 +148,14 @@ class ReActLoop:
 
                     # 回调：通知外层"委派任务"
                     if step_callback:
-                        step_callback({"type": "delegate", "step": step_num,
-                                       "tool": step.action,
-                                       "task": str(step.action_input.get("task", step.action_input))[:300]})
+                        step_callback(
+                            {
+                                "type": "delegate",
+                                "step": step_num,
+                                "tool": step.action,
+                                "task": str(step.action_input.get("task", step.action_input))[:300],
+                            }
+                        )
 
                     # 4. 执行工具（带重试）
                     observation = ReActLoop._execute_tool_with_retry(
@@ -154,10 +166,15 @@ class ReActLoop:
 
                     # 回调：通知外层"收到工具结果"
                     if step_callback:
-                        step_callback({"type": "tool_result", "step": step_num,
-                                       "tool": step.action,
-                                       "result": observation[:500],
-                                       "elapsed_ms": round(step_elapsed * 1000, 2)})
+                        step_callback(
+                            {
+                                "type": "tool_result",
+                                "step": step_num,
+                                "tool": step.action,
+                                "result": observation[:500],
+                                "elapsed_ms": round(step_elapsed * 1000, 2),
+                            }
+                        )
 
                     messages.append({"role": "assistant", "content": raw_output})
                     messages.append({"role": "user", "content": f"Observation: {observation}"})
@@ -169,7 +186,8 @@ class ReActLoop:
                     agent.state = AgentState.DONE
                     return AgentResult(
                         answer=raw_output.strip(),
-                        steps=steps, tool_calls_count=tool_calls_count,
+                        steps=steps,
+                        tool_calls_count=tool_calls_count,
                         loop_type="react",
                         total_elapsed_ms=round((time.perf_counter() - start_time) * 1000, 2),
                         token_usage=total_tokens,
@@ -182,7 +200,8 @@ class ReActLoop:
             agent.state = AgentState.DONE
             return AgentResult(
                 answer="（已达最大推理步数，未能得出最终答案）",
-                steps=steps, tool_calls_count=tool_calls_count,
+                steps=steps,
+                tool_calls_count=tool_calls_count,
                 loop_type="react",
                 total_elapsed_ms=round((time.perf_counter() - start_time) * 1000, 2),
                 token_usage=total_tokens,
@@ -192,7 +211,9 @@ class ReActLoop:
             agent.state = AgentState.ERROR
             logger.error(f"Agent [{agent.name}] ReAct loop error", extra={"error": str(exc)})
             return AgentResult(
-                error=str(exc), steps=steps, tool_calls_count=tool_calls_count,
+                error=str(exc),
+                steps=steps,
+                tool_calls_count=tool_calls_count,
                 loop_type="react",
                 total_elapsed_ms=round((time.perf_counter() - start_time) * 1000, 2),
                 token_usage=total_tokens,
@@ -203,16 +224,12 @@ class ReActLoop:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _execute_tool_with_retry(
-        agent: BaseAgent, tool_name: str, args: dict, max_retries: int = 1
-    ) -> str:
+    def _execute_tool_with_retry(agent: BaseAgent, tool_name: str, args: dict, max_retries: int = 1) -> str:
         """带重试的工具执行。"""
         last_err = ""
         for attempt in range(max_retries + 1):
             if attempt > 0:
-                logger.warning(
-                    f"Agent [{agent.name}] tool [{tool_name}] retry {attempt}/{max_retries}"
-                )
+                logger.warning(f"Agent [{agent.name}] tool [{tool_name}] retry {attempt}/{max_retries}")
                 time.sleep(0.5)
 
             result = ReActLoop._execute_tool(agent, tool_name, args)
@@ -290,10 +307,7 @@ class ReActLoop:
     @staticmethod
     def _has_image(messages: list[dict[str, Any]]) -> bool:
         """检测消息列表中是否包含图片（多模态 content 数组）。"""
-        for msg in messages:
-            if isinstance(msg.get("content"), list):
-                return True
-        return False
+        return any(isinstance(msg.get("content"), list) for msg in messages)
 
     @staticmethod
     def _resolve_model(agent: BaseAgent, messages: list[dict[str, Any]]) -> str | None:

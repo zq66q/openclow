@@ -9,14 +9,14 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import sqlite3
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from core.logger import logger
 
@@ -112,8 +112,9 @@ class HumanReview:
 
         if not self._callbacks:
             logger.warning(f"HumanReview: no callback, auto-approving [{request.request_id}]")
-            result = ReviewResult(request_id=request.request_id, action=ReviewAction.APPROVE,
-                                  comment="（自动通过：未注册审批回调）")
+            result = ReviewResult(
+                request_id=request.request_id, action=ReviewAction.APPROVE, comment="（自动通过：未注册审批回调）"
+            )
         else:
             start = time.time()
             try:
@@ -132,8 +133,9 @@ class HumanReview:
                     )
             except Exception as exc:
                 logger.error(f"HumanReview [{request.request_id}] callback error: {exc}")
-                result = ReviewResult(request_id=request.request_id, action=self._default_action,
-                                      comment=f"回调异常: {exc}")
+                result = ReviewResult(
+                    request_id=request.request_id, action=self._default_action, comment=f"回调异常: {exc}"
+                )
 
         self._pending.pop(request.request_id, None)
         self._history.append(result)
@@ -176,8 +178,11 @@ class HumanReview:
         timeout_seconds: float = 300,
     ) -> ReviewRequest:
         return ReviewRequest(
-            title=title, content=content, source_agent=source_agent,
-            risk_level=risk_level, context=context or {},
+            title=title,
+            content=content,
+            source_agent=source_agent,
+            risk_level=risk_level,
+            context=context or {},
             timeout_seconds=timeout_seconds,
         )
 
@@ -211,8 +216,15 @@ class HumanReview:
             with sqlite3.connect(self._history_path) as conn:
                 conn.execute(
                     "INSERT INTO review_history (request_id, title, source_agent, risk_level, action, comment, reviewed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (request.request_id, request.title, request.source_agent,
-                     request.risk_level, result.action.value, result.comment, time.time()),
+                    (
+                        request.request_id,
+                        request.title,
+                        request.source_agent,
+                        request.risk_level,
+                        result.action.value,
+                        result.comment,
+                        time.time(),
+                    ),
                 )
                 conn.commit()
         except Exception as exc:

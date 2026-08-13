@@ -19,10 +19,9 @@
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from agent.base import BaseAgent
-from core.logger import logger
 
 if TYPE_CHECKING:
     from memory.memory_manager import MemoryManager
@@ -132,6 +131,7 @@ class PresetAgents:
             # 未指定时，尝试获取所有已注册工具
             try:
                 from mcp_tools.registry import get_registry
+
                 agent.tools = get_registry().list_names()
             except Exception:
                 agent.tools = ["datetime", "calculator"]
@@ -264,9 +264,10 @@ class PresetAgents:
 
         # 2. 注入到 delegate_task 工具的全局上下文
         from mcp_tools.tools.orchestrator_tool import (
-            set_orchestrator_context,
             get_orchestrator_agent_list,
+            set_orchestrator_context,
         )
+
         set_orchestrator_context(sub_agents)
 
         # 3. 动态构建 system_prompt（包含子 Agent 列表）
@@ -287,7 +288,7 @@ class PresetAgents:
                 "3. **综合答案**：收集所有专家的回答后，综合给出完整的最终答案\n\n"
                 "## 委派格式\n"
                 "Action: delegate_task\n"
-                "Action Input: {\"agent_name\": \"data_analysis\", \"task\": \"计算2025年销量同比增长率\"}\n\n"
+                'Action Input: {"agent_name": "data_analysis", "task": "计算2025年销量同比增长率"}\n\n'
                 "## 重要原则\n"
                 "- **必须委派的情况**：用户问题涉及多个领域（如数据计算+架构设计、代码+业务分析），"
                 "或需要具体数值/实时数据支撑时，**必须先委派给对应专家，不能直接回答**\n"
@@ -439,12 +440,14 @@ class PresetAgents:
             PresetAgents.from_config({"type": "tool_calling", "tools": ["calculator", "datetime"]})
         """
         agent_type = config.get("type", "general")
-        custom_tools = config.get("tools", None)
-        custom_prompt = config.get("system_prompt", None)
+        custom_tools = config.get("tools")
+        custom_prompt = config.get("system_prompt")
 
         method = getattr(PresetAgents, agent_type, None)
         if method is None:
-            raise ValueError(f"未知 Agent 类型: {agent_type}，支持: general, rag_qa, tool_calling, data_analysis, code_review, multi_agent, researcher, master, plan_execute")
+            raise ValueError(
+                f"未知 Agent 类型: {agent_type}，支持: general, rag_qa, tool_calling, data_analysis, code_review, multi_agent, researcher, master, plan_execute"
+            )
 
         kwargs: dict[str, Any] = {
             "llm_client": config.get("llm_client", llm_client),

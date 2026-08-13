@@ -6,24 +6,19 @@
 
 from __future__ import annotations
 
-import asyncio
-from typing import Annotated, Any, Literal, Sequence
+from typing import Annotated, Any
 
 from core.logger import logger
 
 # ── TypedDict 状态（兼容 LangGraph） ──
 
-try:
-    from typing import NotRequired, Required
-except ImportError:
-    from typing_extensions import NotRequired, Required  # type: ignore[assignment]
-
 # 尽量兼容 LangGraph 存在 / 不存在的环境
 _HAS_LANGGRAPH = False
 try:
+    from langgraph.checkpoint import BaseCheckpointSaver
     from langgraph.graph import END, StateGraph
     from langgraph.graph.message import add_messages
-    from langgraph.checkpoint import BaseCheckpointSaver
+
     _HAS_LANGGRAPH = True
 except ImportError:
     # LangGraph 未安装 — 提供最小 TypedDict + 占位函数
@@ -46,7 +41,7 @@ try:
 except ImportError:
     from typing_extensions import TypedDict
 
-if hasattr(TypedDict, '__flags__'):
+if hasattr(TypedDict, "__flags__"):
     # Python 3.12+ — 用原生语法
     class OpenClawState(TypedDict, total=False):  # type: ignore[valid-type]
         messages: Annotated[list[dict[str, Any]], add_messages]
@@ -144,7 +139,9 @@ def build_graph(
         # 提取最后一个助手消息中的工具调用
         tool_results: list[dict[str, Any]] = []
         last_msg = messages[-1] if messages else {}
-        tool_calls = last_msg.get("tool_calls", []) if isinstance(last_msg, dict) else getattr(last_msg, "tool_calls", [])
+        tool_calls = (
+            last_msg.get("tool_calls", []) if isinstance(last_msg, dict) else getattr(last_msg, "tool_calls", [])
+        )
 
         if not tool_calls:
             return {"messages": messages, "step_count": step}
@@ -153,11 +150,13 @@ def build_graph(
             tool_name = tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
             tool_args = tc.get("arguments", {}) if isinstance(tc, dict) else getattr(tc, "arguments", {})
             tool_result = f"[Tool {tool_name} executed with {tool_args}]"
-            tool_results.append({
-                "role": "tool",
-                "tool_call_id": tc.get("id", "") if isinstance(tc, dict) else getattr(tc, "id", ""),
-                "content": tool_result,
-            })
+            tool_results.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.get("id", "") if isinstance(tc, dict) else getattr(tc, "id", ""),
+                    "content": tool_result,
+                }
+            )
 
         return {
             "messages": messages + tool_results,
@@ -201,6 +200,7 @@ def build_graph(
     if checkpointer is None:
         try:
             from langgraph.checkpoint.memory import MemorySaver
+
             checkpointer = MemorySaver()
         except ImportError:
             pass

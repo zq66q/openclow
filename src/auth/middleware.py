@@ -18,11 +18,10 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import hmac
 import os
 import secrets
 import time
-from typing import Any, Callable
+from typing import Any
 
 from core.logger import logger
 
@@ -51,7 +50,10 @@ try:
 except ImportError:
     HTTPException = Exception  # type: ignore[misc,assignment]
     Request = object  # type: ignore[misc,assignment]
-    Security = lambda x, **_: x  # type: ignore[assignment]
+
+    def Security(x, **_):  # type: ignore[no-redef]
+        return x
+
     APIKeyHeader = object  # type: ignore[misc,assignment]
     HTTPBearer = object  # type: ignore[misc,assignment]
     status = None  # type: ignore[assignment]
@@ -121,10 +123,7 @@ class APIKeyAuth:
         if key is None:
             return False
         # 防御性处理：key 中包含的异常字符不影响比较
-        for valid in self._keys:
-            if secrets.compare_digest(key.strip(), valid):
-                return True
-        return False
+        return any(secrets.compare_digest(key.strip(), valid) for valid in self._keys)
 
     def authenticate(self, request: Any = None, raw_key: str | None = None) -> str:
         """验证并返回用户标识（API Key 的 hash 前缀）。
@@ -248,14 +247,14 @@ class JWTAuth:
                 status_code=status.HTTP_401_UNAUTHORIZED if status else 401,
                 detail="Token expired",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
+            ) from None
         except _jwt_lib.InvalidTokenError as exc:
             logger.warning(f"JWT validation error: {exc}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED if status else 401,
                 detail="Invalid token",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
+            ) from exc
 
     def authenticate(self, request: Any = None, raw_token: str | None = None) -> str:
         """验证并返回 sub（用户标识）。"""
@@ -371,5 +370,5 @@ def auth_guard(
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED if status else 401,
         detail="Authentication failed",
-        headers={"WWW-Authenticate": f'{_API_KEY_HEADER}, Bearer'},
+        headers={"WWW-Authenticate": f"{_API_KEY_HEADER}, Bearer"},
     )

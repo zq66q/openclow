@@ -1,8 +1,9 @@
 """日志系统 - loguru + trace_id 全链路追踪."""
 
 import sys
-from pathlib import Path
 from contextvars import ContextVar
+from pathlib import Path
+
 from loguru import logger
 
 # 上下文变量：trace_id

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/chat", tags=["对话"])
 
 def _get_svc() -> Any:
     from api.server import get_facade
+
     return get_facade()
 
 
@@ -38,7 +40,7 @@ async def chat(req: ChatRequest) -> dict[str, Any]:
             "elapsed_ms": round(elapsed_ms, 1),
         }
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/stream")
@@ -66,24 +68,24 @@ async def chat_stream(req: ChatRequest) -> StreamingResponse:
                 evt_type = event.get("type", "")
 
                 if evt_type == "_done":
-                    yield f'data: {json.dumps({"type": "done", "answer": event["answer"], "elapsed_ms": event["elapsed_ms"], "steps": event.get("steps", [])}, ensure_ascii=False)}\n\n'
+                    yield f"data: {json.dumps({'type': 'done', 'answer': event['answer'], 'elapsed_ms': event['elapsed_ms'], 'steps': event.get('steps', [])}, ensure_ascii=False)}\n\n"
                     break
                 elif evt_type == "_error":
-                    yield f'data: {json.dumps({"type": "error", "error": event["error"]}, ensure_ascii=False)}\n\n'
+                    yield f"data: {json.dumps({'type': 'error', 'error': event['error']}, ensure_ascii=False)}\n\n"
                     break
                 elif evt_type == "think":
-                    yield f'data: {json.dumps({"type": "think", "thought": event.get("thought", ""), "tool": event.get("tool", ""), "task": event.get("task", "")}, ensure_ascii=False)}\n\n'
+                    yield f"data: {json.dumps({'type': 'think', 'thought': event.get('thought', ''), 'tool': event.get('tool', ''), 'task': event.get('task', '')}, ensure_ascii=False)}\n\n"
                 elif evt_type == "delegate":
-                    yield f'data: {json.dumps({"type": "delegate", "tool": event.get("tool", ""), "task": event.get("task", "")}, ensure_ascii=False)}\n\n'
+                    yield f"data: {json.dumps({'type': 'delegate', 'tool': event.get('tool', ''), 'task': event.get('task', '')}, ensure_ascii=False)}\n\n"
                 elif evt_type == "tool_result":
                     result_text = str(event.get("result", ""))[:500]
-                    yield f'data: {json.dumps({"type": "tool_result", "tool": event.get("tool", ""), "result": result_text, "elapsed_ms": event.get("elapsed_ms", 0)}, ensure_ascii=False)}\n\n'
+                    yield f"data: {json.dumps({'type': 'tool_result', 'tool': event.get('tool', ''), 'result': result_text, 'elapsed_ms': event.get('elapsed_ms', 0)}, ensure_ascii=False)}\n\n"
                 elif evt_type == "waiting":
-                    yield f'data: {json.dumps({"type": "heartbeat"}, ensure_ascii=False)}\n\n'
+                    yield f"data: {json.dumps({'type': 'heartbeat'}, ensure_ascii=False)}\n\n"
                 else:
-                    yield f'data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n'
+                    yield f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
         except Exception as exc:
-            yield f'data: {json.dumps({"type": "error", "error": str(exc)}, ensure_ascii=False)}\n\n'
+            yield f"data: {json.dumps({'type': 'error', 'error': str(exc)}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_generator(),

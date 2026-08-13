@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import concurrent.futures
 import threading
-from dataclasses import dataclass, field
+from contextlib import suppress
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from agent.base import AgentResult
 from core.logger import logger
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
 
 class RouteStrategy(str, Enum):
     """路由策略。"""
+
     KEYWORD = "keyword"
     LLM = "llm"
     PRIORITY = "priority"
@@ -38,6 +40,7 @@ class RouteStrategy(str, Enum):
 @dataclass
 class RouteDecision:
     """路由决策记录。"""
+
     agent_name: str
     strategy: RouteStrategy
     confidence: float = 0.0
@@ -47,6 +50,7 @@ class RouteDecision:
 # ====================================================================
 # AgentRouter
 # ====================================================================
+
 
 class AgentRouter:
     """混合路由：根据 query 内容匹配最合适的 Agent。"""
@@ -68,7 +72,7 @@ class AgentRouter:
                     if all("\u4e00" <= c <= "\u9fff" for c in chunk):
                         keywords.append(chunk)
             for word in prompt.lower().split():
-                clean = word.strip("().,;:\"")
+                clean = word.strip('().,;:"')
                 if len(clean) >= 2:
                     keywords.append(clean)
             self._keywords[agent.name] = keywords
@@ -100,7 +104,9 @@ class AgentRouter:
 
     def route_with_decision(self, query: str) -> RouteDecision:
         if len(self._agents) == 1:
-            return RouteDecision(agent_name=self._agents[0].name, strategy=RouteStrategy.KEYWORD, confidence=1.0, reason="唯一 Agent")
+            return RouteDecision(
+                agent_name=self._agents[0].name, strategy=RouteStrategy.KEYWORD, confidence=1.0, reason="唯一 Agent"
+            )
         return self._keyword_route(query.lower())
 
     def _keyword_route(self, query_lower: str) -> RouteDecision:
@@ -111,7 +117,12 @@ class AgentRouter:
             if score > best_score:
                 best_score = score
                 best_agent = agent
-        return RouteDecision(agent_name=best_agent.name, strategy=RouteStrategy.KEYWORD, confidence=float(best_score), reason=f"关键词匹配得分 {best_score}")
+        return RouteDecision(
+            agent_name=best_agent.name,
+            strategy=RouteStrategy.KEYWORD,
+            confidence=float(best_score),
+            reason=f"关键词匹配得分 {best_score}",
+        )
 
     def _llm_route(self, query: str) -> BaseAgent:
         try:
@@ -155,10 +166,12 @@ class AgentRouter:
 # AgentTeam — 真并行多 Agent 协作
 # ====================================================================
 
+
 # 子任务
 @dataclass
 class SubTask:
     """由 lead agent 分解出的子任务。"""
+
     task_id: str = ""
     description: str = ""
     assigned_agent: str = ""  # 指定执行者名称，"" 表示自动路由
@@ -318,9 +331,7 @@ class AgentTeam:
 
     def _decompose_task(self, query: str) -> list[SubTask]:
         """让 lead agent 将复杂 query 分解为子任务。"""
-        worker_list = "\n".join(
-            f"- {w.name}: {w.system_prompt[:80]}" for w in self._workers
-        )
+        worker_list = "\n".join(f"- {w.name}: {w.system_prompt[:80]}" for w in self._workers)
         decompose_prompt = (
             "你是一个任务规划器。请将用户的复杂问题分解为若干个独立的子任务，"
             "每个子任务适合分配给一个专门的下属 Agent 处理。\n\n"
@@ -332,6 +343,7 @@ class AgentTeam:
 
         try:
             import json
+
             reply, _ = self._lead.llm_client.chat(
                 [{"role": "user", "content": decompose_prompt}],
                 temperature=0.2,
@@ -375,9 +387,7 @@ class AgentTeam:
             return AgentResult(error=f"所有 Worker 执行失败: {errors}")
 
         # 让 lead 合成
-        answers_text = "\n\n".join(
-            f"### [{name}]\n{r.answer}" for name, r in results.items() if r.success
-        )
+        answers_text = "\n\n".join(f"### [{name}]\n{r.answer}" for name, r in results.items() if r.success)
         synthesize_prompt = (
             "你是一个信息综合器。以下是多个 Agent 对同一问题的回答。"
             "请综合所有信息，给出一个完整、精炼的最终答案。\n\n"
@@ -400,7 +410,7 @@ class AgentTeam:
                     "total": usage.total_tokens if usage is not None else 0,
                 },
             )
-        except Exception as exc:
+        except Exception:
             # LLM 合成失败，直接拼接
             parts = [f"【{name}】\n{r.answer}" for name, r in results.items() if r.success]
             return AgentResult(
@@ -408,14 +418,9 @@ class AgentTeam:
                 loop_type="team_concat",
             )
 
-    def _synthesize_from_subtasks(
-        self, query: str, sub_results: dict[str, str]
-    ) -> AgentResult:
+    def _synthesize_from_subtasks(self, query: str, sub_results: dict[str, str]) -> AgentResult:
         """合成分解任务的结果。"""
-        answers_text = "\n\n".join(
-            f"### 子任务 [{tid}]\n{answer}"
-            for tid, answer in sub_results.items()
-        )
+        answers_text = "\n\n".join(f"### 子任务 [{tid}]\n{answer}" for tid, answer in sub_results.items())
         synthesize_prompt = (
             "你是一个任务综合器。以下是各个子任务的执行结果。"
             "请综合所有子任务的结果，给出一个完整、条理清晰的最终答案。\n\n"
@@ -438,7 +443,7 @@ class AgentTeam:
                     "total": usage.total_tokens if usage is not None else 0,
                 },
             )
-        except Exception as exc:
+        except Exception:
             parts = [f"【{tid}】\n{a}" for tid, a in sub_results.items()]
             return AgentResult(answer="\n\n".join(parts), loop_type="team_decomposed_concat")
 
@@ -461,10 +466,7 @@ class AgentTeam:
 
         if self._parallel:
             with concurrent.futures.ThreadPoolExecutor(max_workers=self._max_workers) as executor:
-                futures = {
-                    executor.submit(self._safe_run, w, query): w.name
-                    for w in self._workers
-                }
+                futures = {executor.submit(self._safe_run, w, query): w.name for w in self._workers}
                 for future in concurrent.futures.as_completed(futures):
                     name = futures[future]
                     try:
@@ -489,10 +491,8 @@ class AgentTeam:
     def _inject_to(self, worker: BaseAgent) -> None:
         """注入依赖到单个 worker。"""
         if not worker._llm_client:
-            try:
+            with suppress(Exception):
                 worker._llm_client = self._lead.llm_client
-            except Exception:
-                pass
         if not worker.memory:
             worker._memory = self._lead.memory
         if not worker.rag:

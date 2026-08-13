@@ -1,4 +1,4 @@
-#SQLite 结构化存储
+# SQLite 结构化存储
 
 """记忆系统 SQLite 数据库 — 连接管理 + Schema 初始化。
 

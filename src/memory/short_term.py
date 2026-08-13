@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from core.logger import logger
 from core.settings import settings
@@ -138,9 +138,7 @@ class ShortTermMemory:
         # 优先 LLM 摘要
         if llm_client is not None:
             try:
-                dialog = "\n".join(
-                    f"[{m.role}]: {m.content}" for m in to_compress
-                )
+                dialog = "\n".join(f"[{m.role}]: {m.content}" for m in to_compress)
                 prompt = (
                     "请将以下对话历史压缩为一段简短摘要（限 200 字），"
                     "只保留关键信息：实体名称、用户偏好、重要结论、待办事项。\n\n"
@@ -200,11 +198,13 @@ class ShortTermMemory:
         """从字典恢复。"""
         stm = cls(user_id=data.get("user_id", "default"))
         for item in data.get("messages", []):
-            stm._messages.append(Message(
-                role=item["role"],
-                content=item["content"],
-                timestamp=item.get("timestamp", time.time()),
-            ))
+            stm._messages.append(
+                Message(
+                    role=item["role"],
+                    content=item["content"],
+                    timestamp=item.get("timestamp", time.time()),
+                )
+            )
         stm._summaries = data.get("summaries", [])
         return stm
 

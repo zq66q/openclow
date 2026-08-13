@@ -9,14 +9,13 @@
 from __future__ import annotations
 
 import csv
-import io
 from pathlib import Path
 from typing import Any
-
 
 # ------------------------------------------------------------------
 # 统一入口
 # ------------------------------------------------------------------
+
 
 def parse_file(file_path: str | Path) -> tuple[str, dict[str, Any]]:
     """自动检测文件类型并解析。
@@ -45,7 +44,25 @@ def parse_file(file_path: str | Path) -> tuple[str, dict[str, Any]]:
         text = parse_html(file_path)
     elif suffix in (".csv", ".tsv"):
         text = parse_csv(file_path)
-    elif suffix in (".md", ".markdown", ".txt", ".log", ".json", ".xml", ".yaml", ".yml", ".py", ".js", ".ts", ".java", ".go", ".rs", ".cpp", ".c", ".h"):
+    elif suffix in (
+        ".md",
+        ".markdown",
+        ".txt",
+        ".log",
+        ".json",
+        ".xml",
+        ".yaml",
+        ".yml",
+        ".py",
+        ".js",
+        ".ts",
+        ".java",
+        ".go",
+        ".rs",
+        ".cpp",
+        ".c",
+        ".h",
+    ):
         text = parse_text(file_path)
     else:
         # 未知类型 fallback 为纯文本
@@ -63,6 +80,7 @@ def parse_file(file_path: str | Path) -> tuple[str, dict[str, Any]]:
 # 解析器实现
 # ------------------------------------------------------------------
 
+
 def parse_pdf(file_path: str | Path) -> str:
     """解析 PDF 文件，提取文本内容。
 
@@ -75,6 +93,7 @@ def parse_pdf(file_path: str | Path) -> str:
     # 尝试 pdfplumber
     try:
         import pdfplumber
+
         with pdfplumber.open(str(file_path)) as pdf:
             for page in pdf.pages:
                 page_text = page.extract_text()
@@ -83,9 +102,7 @@ def parse_pdf(file_path: str | Path) -> str:
                 # 也尝试提取表格
                 for table in page.extract_tables():
                     if table:
-                        rows = [" | ".join(
-                            str(cell or "") for cell in row
-                        ) for row in table]
+                        rows = [" | ".join(str(cell or "") for cell in row) for row in table]
                         text_parts.append("\n".join(rows))
         return "\n\n".join(text_parts)
     except ImportError:
@@ -96,6 +113,7 @@ def parse_pdf(file_path: str | Path) -> str:
     # 回退到 PyPDF2
     try:
         from PyPDF2 import PdfReader
+
         reader = PdfReader(str(file_path))
         for page in reader.pages:
             page_text = page.extract_text()
@@ -104,10 +122,8 @@ def parse_pdf(file_path: str | Path) -> str:
         return "\n\n".join(text_parts)
     except ImportError:
         raise ImportError(
-            "无法解析 PDF 文件。请安装 pdfplumber 或 PyPDF2:\n"
-            "  pip install pdfplumber\n"
-            "  pip install PyPDF2"
-        )
+            "无法解析 PDF 文件。请安装 pdfplumber 或 PyPDF2:\n  pip install pdfplumber\n  pip install PyPDF2"
+        ) from None
 
 
 def parse_docx(file_path: str | Path) -> str:
@@ -115,10 +131,7 @@ def parse_docx(file_path: str | Path) -> str:
     try:
         import docx
     except ImportError:
-        raise ImportError(
-            "无法解析 Word 文件。请安装 python-docx:\n"
-            "  pip install python-docx"
-        )
+        raise ImportError("无法解析 Word 文件。请安装 python-docx:\n  pip install python-docx") from None
 
     doc = docx.Document(str(file_path))
     paragraphs: list[str] = []
@@ -141,10 +154,7 @@ def parse_pptx(file_path: str | Path) -> str:
     try:
         from pptx import Presentation
     except ImportError:
-        raise ImportError(
-            "无法解析 PPT 文件。请安装 python-pptx:\n"
-            "  pip install python-pptx"
-        )
+        raise ImportError("无法解析 PPT 文件。请安装 python-pptx:\n  pip install python-pptx") from None
 
     prs = Presentation(str(file_path))
     slides_text: list[str] = []
@@ -171,10 +181,7 @@ def parse_excel(file_path: str | Path) -> str:
     try:
         import openpyxl
     except ImportError:
-        raise ImportError(
-            "无法解析 Excel 文件。请安装 openpyxl:\n"
-            "  pip install openpyxl"
-        )
+        raise ImportError("无法解析 Excel 文件。请安装 openpyxl:\n  pip install openpyxl") from None
 
     wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
     sheets_text: list[str] = []
@@ -184,9 +191,7 @@ def parse_excel(file_path: str | Path) -> str:
         rows: list[str] = [f"--- Sheet: {sheet_name} ---"]
 
         for row in ws.iter_rows(values_only=True):
-            row_str = " | ".join(
-                str(cell) if cell is not None else "" for cell in row
-            )
+            row_str = " | ".join(str(cell) if cell is not None else "" for cell in row)
             if row_str.strip(" |"):
                 rows.append(row_str)
 
@@ -201,10 +206,7 @@ def parse_html(file_path: str | Path) -> str:
     try:
         from bs4 import BeautifulSoup
     except ImportError:
-        raise ImportError(
-            "无法解析 HTML 文件。请安装 beautifulsoup4:\n"
-            "  pip install beautifulsoup4"
-        )
+        raise ImportError("无法解析 HTML 文件。请安装 beautifulsoup4:\n  pip install beautifulsoup4") from None
 
     with open(file_path, encoding="utf-8", errors="replace") as f:
         soup = BeautifulSoup(f.read(), "html.parser")

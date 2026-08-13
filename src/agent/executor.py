@@ -22,12 +22,14 @@ class AgentExecutor:
     """Agent 执行器（纯静态方法，无内部状态）。"""
 
     # 指数退避参数
-    BACKOFF_BASE = 1.0     # 基础等待秒数
-    BACKOFF_MAX = 30.0     # 最大等待秒数
+    BACKOFF_BASE = 1.0  # 基础等待秒数
+    BACKOFF_MAX = 30.0  # 最大等待秒数
     BACKOFF_MULTIPLIER = 2.0
 
     @staticmethod
-    def run(agent: BaseAgent, query: str, step_callback: callable | None = None, image_data: str | None = None) -> AgentResult:
+    def run(
+        agent: BaseAgent, query: str, step_callback: callable | None = None, image_data: str | None = None
+    ) -> AgentResult:
         """执行一次 Agent 推理。"""
         logger.info(
             f"AgentExecutor.run [{agent.name}]",
@@ -39,17 +41,21 @@ class AgentExecutor:
 
         if agent.loop_type == "function":
             from agent.function_loop import FunctionCallingLoop
+
             result = FunctionCallingLoop.run(agent, query, image_data=image_data)
         elif agent.loop_type == "plan_execute":
             from agent.plan_execute_loop import PlanExecuteLoop
+
             result = PlanExecuteLoop.run(agent, query, step_callback=step_callback, image_data=image_data)
         else:
             from agent.react_loop import ReActLoop
+
             result = ReActLoop.run(agent, query, step_callback=step_callback, image_data=image_data)
 
         # 记录可观测性指标
         try:
             from agent.observability import get_observability
+
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             obs = get_observability()
             obs.record_call(
@@ -87,9 +93,7 @@ class AgentExecutor:
         for attempt in range(max_retries + 1):
             if attempt > 0:
                 wait = AgentExecutor._calc_backoff(attempt) if backoff else 0
-                logger.warning(
-                    f"Agent [{agent.name}] retry {attempt}/{max_retries} (wait {wait:.1f}s)"
-                )
+                logger.warning(f"Agent [{agent.name}] retry {attempt}/{max_retries} (wait {wait:.1f}s)")
                 if wait > 0:
                     time.sleep(wait)
 

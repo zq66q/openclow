@@ -13,12 +13,12 @@
     # await mm.compressor.run()
 """
 
-from memory.db import MemoryDB
-from memory.memory_manager import MemoryManager
-from memory.short_term import ShortTermMemory, Message
-from memory.long_term import MemoryEntry, SQLiteMemoryStore, SemanticMemoryStore
-from memory.extractor import MemoryExtractor
 from memory.compressor import MemoryCompressor
+from memory.db import MemoryDB
+from memory.extractor import MemoryExtractor
+from memory.long_term import MemoryEntry, SemanticMemoryStore, SQLiteMemoryStore
+from memory.memory_manager import MemoryManager
+from memory.short_term import Message, ShortTermMemory
 
 __all__ = [
     # 入口

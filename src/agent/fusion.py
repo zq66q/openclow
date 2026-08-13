@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from core.logger import logger
 
@@ -108,6 +108,7 @@ class ResultFusion:
 
                 reply, _ = llm_client.chat([{"role": "user", "content": conflict_prompt}], temperature=0)
                 import json
+
                 try:
                     detected = json.loads(reply.strip())
                     for item in detected:
@@ -156,26 +157,31 @@ class ResultFusion:
     @staticmethod
     def _concat(valid: dict[str, AgentResult]) -> FusionResult:
         parts = [f"【{name}】\n{result.answer}" for name, result in valid.items()]
-        return FusionResult(answer="\n\n".join(parts), sources=list(valid.keys()),
-                            strategy=FusionStrategy.CONCAT, confidence=0.8)
+        return FusionResult(
+            answer="\n\n".join(parts), sources=list(valid.keys()), strategy=FusionStrategy.CONCAT, confidence=0.8
+        )
 
     @staticmethod
     def _vote(valid: dict[str, AgentResult], conflicts: list[str] = None) -> FusionResult:
         if len(valid) == 1:
             name, result = next(iter(valid.items()))
-            return FusionResult(answer=result.answer, sources=[name],
-                                strategy=FusionStrategy.VOTE, confidence=1.0)
+            return FusionResult(answer=result.answer, sources=[name], strategy=FusionStrategy.VOTE, confidence=1.0)
 
         best_name = max(valid.keys(), key=lambda k: len(valid[k].answer))
         best_result = valid[best_name]
 
-        return FusionResult(answer=best_result.answer, sources=list(valid.keys()),
-                            strategy=FusionStrategy.VOTE, confidence=0.7,
-                            conflicts=conflicts or [])
+        return FusionResult(
+            answer=best_result.answer,
+            sources=list(valid.keys()),
+            strategy=FusionStrategy.VOTE,
+            confidence=0.7,
+            conflicts=conflicts or [],
+        )
 
     @staticmethod
-    def _llm_synthesize(valid: dict[str, AgentResult], llm_client: Any = None,
-                        conflicts: list[str] = None) -> FusionResult:
+    def _llm_synthesize(
+        valid: dict[str, AgentResult], llm_client: Any = None, conflicts: list[str] = None
+    ) -> FusionResult:
         if llm_client is None:
             logger.warning("LLM_SYNTHESIZE 降级: 无 llm_client，回退到 CONCAT")
             return ResultFusion._concat(valid)
@@ -189,9 +195,7 @@ class ResultFusion:
                 ans = ans[:max_each] + f"\n\n…（已截断，原文 {len(result.answer)} 字符）"
             truncated[name] = ans
 
-        answers_text = "\n\n".join(
-            f"来源 [{name}]:\n{ans}" for name, ans in truncated.items()
-        )
+        answers_text = "\n\n".join(f"来源 [{name}]:\n{ans}" for name, ans in truncated.items())
         prompt = (
             "你是一个信息综合器。以下是多个专家对同一问题的回答。"
             "请综合所有信息，给出一个完整、简洁的最终答案（控制在500字以内）。"
@@ -210,9 +214,14 @@ class ResultFusion:
                     "total": getattr(usage, "total_tokens", 0),
                 }
             logger.info(f"LLM_SYNTHESIZE 成功, 答案长度: {len(reply)}")
-            return FusionResult(answer=reply.strip(), sources=list(valid.keys()),
-                                strategy=FusionStrategy.LLM_SYNTHESIZE, confidence=0.85,
-                                conflicts=conflicts or [], token_usage=token_usage)
+            return FusionResult(
+                answer=reply.strip(),
+                sources=list(valid.keys()),
+                strategy=FusionStrategy.LLM_SYNTHESIZE,
+                confidence=0.85,
+                conflicts=conflicts or [],
+                token_usage=token_usage,
+            )
         except Exception as exc:
             logger.error(f"LLM_SYNTHESIZE 失败，回退到 CONCAT: {exc}")
             return ResultFusion._concat(valid)

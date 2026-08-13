@@ -11,22 +11,22 @@
 from __future__ import annotations
 
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from core.logger import logger
 from core.settings import settings
 from memory.db import MemoryDB
-from memory.short_term import ShortTermMemory
 from memory.long_term import (
     MemoryEntry,
-    SQLiteMemoryStore,
     SemanticMemoryStore,
+    SQLiteMemoryStore,
 )
+from memory.short_term import ShortTermMemory
 
 if TYPE_CHECKING:
     from core.llm_client import BaseLLMClient
-    from memory.extractor import MemoryExtractor
     from memory.compressor import MemoryCompressor
+    from memory.extractor import MemoryExtractor
 
 
 class MemoryManager:
@@ -103,7 +103,6 @@ class MemoryManager:
         Returns:
             生成的摘要文本，未触发则 None
         """
-        interval = settings.memory.short_term_max_tokens
         message_count = self.short_term.message_count()
 
         if not force and message_count < 10:
@@ -324,8 +323,8 @@ class MemoryManager:
         Returns:
             MemoryExtractor 实例，也可通过 mm._extractor 访问
         """
-        from memory.extractor import MemoryExtractor
         from memory.compressor import MemoryCompressor
+        from memory.extractor import MemoryExtractor
 
         self._extractor = MemoryExtractor(llm_client, self)
         self._compressor = MemoryCompressor(llm_client, self, self._extractor)

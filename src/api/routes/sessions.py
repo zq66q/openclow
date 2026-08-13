@@ -13,6 +13,7 @@ router = APIRouter(prefix="/sessions", tags=["会话"])
 
 def _get_sm() -> Any:
     from api.server import get_facade
+
     svc = get_facade()
     sm = svc.session_manager
     if sm is None:

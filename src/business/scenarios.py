@@ -25,17 +25,16 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from threading import Lock
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from business.session import Session, SessionManager
 from core.logger import logger
 
-from business.session import SessionManager, Session
-
 if TYPE_CHECKING:
-    from agent.base import BaseAgent, AgentResult
-    from business.session import SessionManager, Session
+    from agent.base import BaseAgent
+    from business.session import Session, SessionManager
     from memory.memory_manager import MemoryManager
     from rag.pipeline import RAGPipeline
 
@@ -161,9 +160,7 @@ class ScenarioApp:
 
             # 记录用户消息
             if self._auto_save:
-                self.session_manager.append_message(
-                    self._current_session.session_id, "user", query
-                )
+                self.session_manager.append_message(self._current_session.session_id, "user", query)
 
             # 执行 Agent（传入图片数据）
             result = self.agent.run(query, image_data=image_data)
@@ -177,9 +174,7 @@ class ScenarioApp:
 
             # 记录助手回复
             if self._auto_save:
-                self.session_manager.append_message(
-                    self._current_session.session_id, "assistant", answer
-                )
+                self.session_manager.append_message(self._current_session.session_id, "assistant", answer)
 
             # 记忆注入
             if self.memory:
@@ -252,9 +247,7 @@ class ScenarioApp:
         now = time.time()
         window = 60.0
         # 清理过期记录
-        self._last_request_times = [
-            t for t in self._last_request_times if now - t < window
-        ]
+        self._last_request_times = [t for t in self._last_request_times if now - t < window]
         if len(self._last_request_times) >= self._rate_limit_per_minute:
             oldest = self._last_request_times[0]
             wait = window - (now - oldest) + 0.1
@@ -356,8 +349,8 @@ class ScenarioBuilder:
         # RAG 准备
         pipeline = rag_pipeline
         if pipeline is None and docs_dir:
-            from rag.pipeline import RAGPipeline
             from core.embedding_client import EmbeddingClient
+            from rag.pipeline import RAGPipeline
 
             embed_client = EmbeddingClient()
             pipeline = RAGPipeline(

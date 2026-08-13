@@ -20,8 +20,8 @@ from auth.middleware import (
     APIKeyAuth,
     JWTAuth,
     api_key_guard,
-    jwt_guard,
     generate_api_key,
+    jwt_guard,
 )
 
 __all__ = [

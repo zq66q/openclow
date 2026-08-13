@@ -9,16 +9,16 @@ from __future__ import annotations
 import os
 
 import pytest
+from fastapi import HTTPException
 
 from auth.middleware import (
     APIKeyAuth,
     JWTAuth,
-    generate_api_key,
     _get_auth_mode,
     _get_env_keys,
     _get_jwt_secret,
+    generate_api_key,
 )
-
 
 # ── generate_api_key ──
 
@@ -65,7 +65,7 @@ class TestAPIKeyAuth:
 
     def test_authenticate_fail_raises(self):
         auth = APIKeyAuth(valid_keys=["valid"])
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException):
             auth.authenticate(raw_key="invalid")
 
     def test_extract_key_from_dict(self):
@@ -110,14 +110,14 @@ class TestJWTAuth:
         auth = JWTAuth(secret="test_secret_1234567890")
         if not auth.enabled:
             pytest.skip("PyJWT not installed")
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException):
             auth.decode("not.a.token")
 
     def test_decode_none(self):
         auth = JWTAuth(secret="test_secret_1234567890")
         if not auth.enabled:
             pytest.skip("PyJWT not installed")
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPException):
             auth.decode(None)
 
     def test_extract_token_from_bearer(self):
@@ -192,19 +192,22 @@ class TestAuthGuard:
     def test_none_mode(self, monkeypatch):
         monkeypatch.setenv("OPENCLAW_AUTH_MODE", "none")
         from auth.middleware import auth_guard
+
         assert auth_guard() == "anonymous"
 
     def test_apikey_mode_fail(self, monkeypatch):
         monkeypatch.setenv("OPENCLAW_AUTH_MODE", "apikey")
         monkeypatch.setenv("OPENCLAW_API_KEYS", "secret")
         from auth.middleware import auth_guard
-        with pytest.raises(Exception):
+
+        with pytest.raises(HTTPException):
             auth_guard()
 
     def test_apikey_mode_success(self, monkeypatch):
         monkeypatch.setenv("OPENCLAW_AUTH_MODE", "apikey")
         monkeypatch.setenv("OPENCLAW_API_KEYS", "mykey")
         from auth.middleware import auth_guard
+
         uid = auth_guard(raw_key="mykey")
         assert uid.startswith("apikey_")
 
@@ -212,5 +215,6 @@ class TestAuthGuard:
         monkeypatch.setenv("OPENCLAW_AUTH_MODE", "both")
         monkeypatch.setenv("OPENCLAW_API_KEYS", "k1")
         from auth.middleware import auth_guard
+
         uid = auth_guard(raw_key="k1")
         assert uid.startswith("apikey_")

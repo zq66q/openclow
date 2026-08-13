@@ -16,7 +16,6 @@ from typing import Any
 
 from core.settings import settings
 
-
 # 句子结束标点（中英文）
 _SENTENCE_END = re.compile(r"(?<=[。！？.!?\n])\s*")
 
@@ -41,6 +40,7 @@ class Chunk:
 # TextChunker — 通用文本分块（优化版，修复 O(n²)）
 # ====================================================================
 
+
 class TextChunker:
     """通用文本切片器。
 
@@ -58,9 +58,7 @@ class TextChunker:
         self.chunk_overlap = chunk_overlap or settings.rag.chunk_overlap
 
         if self.chunk_overlap >= self.chunk_size:
-            raise ValueError(
-                f"chunk_overlap ({self.chunk_overlap}) 必须小于 chunk_size ({self.chunk_size})"
-            )
+            raise ValueError(f"chunk_overlap ({self.chunk_overlap}) 必须小于 chunk_size ({self.chunk_size})")
 
     def split(self, text: str, metadata: dict[str, Any] | None = None) -> list[Chunk]:
         """切分文本为语义片段。"""
@@ -96,12 +94,14 @@ class TextChunker:
 
             if current_len + sent_len > self.chunk_size and current:
                 content = "".join(current)
-                chunks.append(Chunk(
-                    content=content,
-                    metadata=dict(base_meta, chunk_index=len(chunks)),
-                    start_pos=current_start,
-                    end_pos=sent_start,
-                ))
+                chunks.append(
+                    Chunk(
+                        content=content,
+                        metadata=dict(base_meta, chunk_index=len(chunks)),
+                        start_pos=current_start,
+                        end_pos=sent_start,
+                    )
+                )
 
                 # 重叠：保留最后 overlap 长度的字符
                 overlap_chars = 0
@@ -127,12 +127,14 @@ class TextChunker:
         # 最后一段
         if current:
             content = "".join(current)
-            chunks.append(Chunk(
-                content=content,
-                metadata=dict(base_meta, chunk_index=len(chunks)),
-                start_pos=current_start,
-                end_pos=len(text),
-            ))
+            chunks.append(
+                Chunk(
+                    content=content,
+                    metadata=dict(base_meta, chunk_index=len(chunks)),
+                    start_pos=current_start,
+                    end_pos=len(text),
+                )
+            )
 
         return chunks
 
@@ -140,6 +142,7 @@ class TextChunker:
 # ====================================================================
 # MarkdownChunker — 按标题层级分块
 # ====================================================================
+
 
 class MarkdownChunker:
     """Markdown 文档分块器。
@@ -188,12 +191,14 @@ class MarkdownChunker:
 
             if section_len <= self.chunk_size:
                 # 直接作为一个 chunk
-                chunks.append(Chunk(
-                    content=section_text,
-                    metadata=dict(section_meta, chunk_index=len(chunks)),
-                    start_pos=section_start,
-                    end_pos=section_end,
-                ))
+                chunks.append(
+                    Chunk(
+                        content=section_text,
+                        metadata=dict(section_meta, chunk_index=len(chunks)),
+                        start_pos=section_start,
+                        end_pos=section_end,
+                    )
+                )
             else:
                 # 超长 section，回退到文本分块（保留 heading path）
                 sub_chunks = self._text_chunker.split(section_text, metadata=section_meta)
@@ -222,7 +227,7 @@ class MarkdownChunker:
 
         # 第一个 section：标题之前的内容
         if headings[0][0] > 0:
-            sections.append(("", text[:headings[0][0]].strip()))
+            sections.append(("", text[: headings[0][0]].strip()))
 
         # 构建 heading path
         path_stack: list[tuple[int, str]] = []  # [(level, heading_text), ...]
@@ -235,10 +240,7 @@ class MarkdownChunker:
             heading_path = " > ".join(h[1] for h in path_stack)
 
             # section 结束位置
-            if idx + 1 < len(headings):
-                end = headings[idx + 1][0]
-            else:
-                end = len(text)
+            end = headings[idx + 1][0] if idx + 1 < len(headings) else len(text)
 
             # 提取 section 全文（包含标题行）
             section_text = text[start:end].strip()
@@ -251,6 +253,7 @@ class MarkdownChunker:
 # ====================================================================
 # CodeChunker — 代码文件分块
 # ====================================================================
+
 
 class CodeChunker:
     """代码文件分块器。
@@ -267,23 +270,22 @@ class CodeChunker:
 
     # 常见语言的函数定义行正则
     _FUNC_PATTERNS: dict[str, re.Pattern] = {
-        "python": re.compile(
-            r"^(def\s+\w+|class\s+\w+|async\s+def\s+\w+)", re.MULTILINE
-        ),
+        "python": re.compile(r"^(def\s+\w+|class\s+\w+|async\s+def\s+\w+)", re.MULTILINE),
         "javascript": re.compile(
-            r"^(function\s+\w+|class\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\(|let\s+\w+\s*=\s*(?:async\s*)?\()", re.MULTILINE
+            r"^(function\s+\w+|class\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\(|let\s+\w+\s*=\s*(?:async\s*)?\()",
+            re.MULTILINE,
         ),
         "typescript": re.compile(
-            r"^(function\s+\w+|class\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\(|let\s+\w+\s*=\s*(?:async\s*)?\(|interface\s+\w+|type\s+\w+)", re.MULTILINE
+            r"^(function\s+\w+|class\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\(|let\s+\w+\s*=\s*(?:async\s*)?\(|interface\s+\w+|type\s+\w+)",
+            re.MULTILINE,
         ),
         "go": re.compile(r"^(func\s+|type\s+\w+\s+struct)", re.MULTILINE),
         "java": re.compile(
-            r"^\s*(public|private|protected|static|\s)*\s*(class|interface|enum)\s+\w+|^\s*(public|private|protected|static|\s)*\s*\w+\s+\w+\s*\(", re.MULTILINE
+            r"^\s*(public|private|protected|static|\s)*\s*(class|interface|enum)\s+\w+|^\s*(public|private|protected|static|\s)*\s*\w+\s+\w+\s*\(",
+            re.MULTILINE,
         ),
         "rust": re.compile(r"^(fn\s+\w+|struct\s+\w+|impl\s+|trait\s+\w+)", re.MULTILINE),
-        "cpp": re.compile(
-            r"^\s*\w+\s+\w+\s*\(|^\s*class\s+\w+|^\s*struct\s+\w+", re.MULTILINE
-        ),
+        "cpp": re.compile(r"^\s*\w+\s+\w+\s*\(|^\s*class\s+\w+|^\s*struct\s+\w+", re.MULTILINE),
     }
 
     def __init__(
@@ -321,12 +323,14 @@ class CodeChunker:
 
         # 如果文件太小且无结构边界，直接单块
         if len(text) <= self.chunk_size:
-            return [Chunk(
-                content=text,
-                metadata=dict(base_meta, chunk_index=0),
-                start_pos=0,
-                end_pos=len(text),
-            )]
+            return [
+                Chunk(
+                    content=text,
+                    metadata=dict(base_meta, chunk_index=0),
+                    start_pos=0,
+                    end_pos=len(text),
+                )
+            ]
 
         # 回退：行级滑动窗口
         return self._line_window_split(lines, base_meta)
@@ -340,6 +344,7 @@ class CodeChunker:
         """使用 Python AST 按函数/类边界分块。"""
         try:
             import ast
+
             tree = ast.parse(text)
         except (SyntaxError, ImportError):
             return []
@@ -364,12 +369,14 @@ class CodeChunker:
             chunk_lines = lines[start_idx:end_idx]
             chunk_text = "\n".join(chunk_lines)
             if chunk_text.strip():
-                chunks.append(Chunk(
-                    content=chunk_text,
-                    metadata=dict(base_meta, chunk_index=len(chunks), symbol=name),
-                    start_pos=sum(len(l) + 1 for l in lines[:start_idx]),
-                    end_pos=sum(len(l) + 1 for l in lines[:end_idx]),
-                ))
+                chunks.append(
+                    Chunk(
+                        content=chunk_text,
+                        metadata=dict(base_meta, chunk_index=len(chunks), symbol=name),
+                        start_pos=sum(len(line) + 1 for line in lines[:start_idx]),
+                        end_pos=sum(len(line) + 1 for line in lines[:end_idx]),
+                    )
+                )
 
         return chunks
 
@@ -378,9 +385,7 @@ class CodeChunker:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _func_split(
-        text: str, lines: list[str], language: str, base_meta: dict
-    ) -> list[Chunk]:
+    def _func_split(text: str, lines: list[str], language: str, base_meta: dict) -> list[Chunk]:
         """按函数/类定义行分块。"""
         pattern = CodeChunker._FUNC_PATTERNS.get(language)
         if not pattern:
@@ -389,7 +394,7 @@ class CodeChunker:
         # 找到所有函数/类开始行
         boundaries: list[int] = [0]
         for m in pattern.finditer(text):
-            line_idx = text[:m.start()].count("\n")
+            line_idx = text[: m.start()].count("\n")
             boundaries.append(line_idx)
 
         if len(boundaries) <= 1:
@@ -406,12 +411,14 @@ class CodeChunker:
             if chunk_text.strip():
                 # 提取函数名
                 first_line = chunk_lines[0].strip() if chunk_lines else ""
-                chunks.append(Chunk(
-                    content=chunk_text,
-                    metadata=dict(base_meta, chunk_index=len(chunks), symbol=first_line[:60]),
-                    start_pos=sum(len(l) + 1 for l in lines[:start]),
-                    end_pos=sum(len(l) + 1 for l in lines[:end]),
-                ))
+                chunks.append(
+                    Chunk(
+                        content=chunk_text,
+                        metadata=dict(base_meta, chunk_index=len(chunks), symbol=first_line[:60]),
+                        start_pos=sum(len(line) + 1 for line in lines[:start]),
+                        end_pos=sum(len(line) + 1 for line in lines[:end]),
+                    )
+                )
 
         return chunks
 
@@ -419,9 +426,7 @@ class CodeChunker:
     # 行级滑动窗口（回退）
     # ------------------------------------------------------------------
 
-    def _line_window_split(
-        self, lines: list[str], base_meta: dict
-    ) -> list[Chunk]:
+    def _line_window_split(self, lines: list[str], base_meta: dict) -> list[Chunk]:
         """行级滑动窗口分块。"""
         chunks: list[Chunk] = []
         current_lines: list[str] = []
@@ -432,31 +437,37 @@ class CodeChunker:
             line_len = len(line) + 1  # +1 for newline
             if current_len + line_len > self.chunk_size and current_lines:
                 content = "\n".join(current_lines)
-                chunks.append(Chunk(
-                    content=content,
-                    metadata=dict(base_meta, chunk_index=len(chunks)),
-                    start_pos=current_start,
-                    end_pos=current_start + len(content),
-                ))
+                chunks.append(
+                    Chunk(
+                        content=content,
+                        metadata=dict(base_meta, chunk_index=len(chunks)),
+                        start_pos=current_start,
+                        end_pos=current_start + len(content),
+                    )
+                )
                 # overlap
-                overlap = current_lines[-self.overlap_lines:] if self.overlap_lines > 0 else []
+                overlap = current_lines[-self.overlap_lines :] if self.overlap_lines > 0 else []
                 current_lines = overlap
-                current_start += len("\n".join(current_lines[:-len(overlap)])) + (1 if len(current_lines) > len(overlap) else 0)
-                current_len = sum(len(l) + 1 for l in overlap)
+                current_start += len("\n".join(current_lines[: -len(overlap)])) + (
+                    1 if len(current_lines) > len(overlap) else 0
+                )
+                current_len = sum(len(line) + 1 for line in overlap)
 
             current_lines.append(line)
             current_len += line_len
             if len(current_lines) == 1:
-                current_start = sum(len(l) + 1 for l in lines[:lines.index(line)])
+                current_start = sum(len(line) + 1 for line in lines[: lines.index(line)])
 
         if current_lines:
             content = "\n".join(current_lines)
-            chunks.append(Chunk(
-                content=content,
-                metadata=dict(base_meta, chunk_index=len(chunks)),
-                start_pos=            current_start,
-                end_pos=current_start + len(content),
-            ))
+            chunks.append(
+                Chunk(
+                    content=content,
+                    metadata=dict(base_meta, chunk_index=len(chunks)),
+                    start_pos=current_start,
+                    end_pos=current_start + len(content),
+                )
+            )
 
         return chunks
 
@@ -465,21 +476,26 @@ class CodeChunker:
 # AST 辅助 —— 递归收集函数/类节点
 # ------------------------------------------------------------------
 
+
 def _collect_nodes(node: Any, out: list[tuple[int, int, str]]) -> None:
     """递归收集 AST 中的函数定义和类定义节点。"""
     import ast as _ast
 
     if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
-        out.append((
-            node.lineno,
-            getattr(node, "end_lineno", node.lineno) or node.lineno,
-            f"def {node.name}()",
-        ))
+        out.append(
+            (
+                node.lineno,
+                getattr(node, "end_lineno", node.lineno) or node.lineno,
+                f"def {node.name}()",
+            )
+        )
     elif isinstance(node, _ast.ClassDef):
-        out.append((
-            node.lineno,
-            getattr(node, "end_lineno", node.lineno) or node.lineno,
-            f"class {node.name}",
-        ))
+        out.append(
+            (
+                node.lineno,
+                getattr(node, "end_lineno", node.lineno) or node.lineno,
+                f"class {node.name}",
+            )
+        )
         for child in _ast.iter_child_nodes(node):
             _collect_nodes(child, out)

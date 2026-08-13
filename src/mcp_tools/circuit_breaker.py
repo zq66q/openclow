@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 from core.exceptions import CircuitBreakerOpen
 from core.logger import logger
@@ -30,7 +31,7 @@ class CircuitBreaker:
         self.recovery_timeout = recovery_timeout
         self.half_open_max_calls = half_open_max_calls
 
-        self._state = "CLOSED"          # CLOSED / OPEN / HALF_OPEN
+        self._state = "CLOSED"  # CLOSED / OPEN / HALF_OPEN
         self._failures = 0
         self._last_failure_time: float | None = None
         self._half_open_calls = 0
@@ -135,6 +136,7 @@ class CircuitBreaker:
 # 装饰器
 # ------------------------------------------------------------------------------
 
+
 def with_circuit_breaker(
     name: str | None = None,
     failure_threshold: int = 5,
@@ -147,6 +149,7 @@ def with_circuit_breaker(
         def search(query: str) -> dict:
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         cb_name = name or func.__name__
         cb = CircuitBreaker(

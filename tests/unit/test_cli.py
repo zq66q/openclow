@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -86,8 +85,9 @@ class TestBuildParser:
 
 class TestCmdKey:
     def test_generates_key(self, capsys):
-        from cli import cmd_key
         import argparse
+
+        from cli import cmd_key
 
         args = argparse.Namespace()
         result = cmd_key(args)
@@ -96,8 +96,9 @@ class TestCmdKey:
         assert "oc_" in captured
 
     def test_shows_env_hint(self, capsys):
-        from cli import cmd_key
         import argparse
+
+        from cli import cmd_key
 
         args = argparse.Namespace()
         cmd_key(args)
@@ -111,8 +112,9 @@ class TestCmdKey:
 class TestCmdToken:
     def test_no_secret(self, capsys, monkeypatch):
         monkeypatch.delenv("OPENCLAW_JWT_SECRET", raising=False)
-        from cli import cmd_token
         import argparse
+
+        from cli import cmd_token
 
         args = argparse.Namespace(sub="user", expire=24)
         result = cmd_token(args)
@@ -122,8 +124,9 @@ class TestCmdToken:
 
     def test_with_secret(self, capsys, monkeypatch):
         monkeypatch.setenv("OPENCLAW_JWT_SECRET", "test_secret_1234567890")
-        from cli import cmd_token
         import argparse
+
+        from cli import cmd_token
 
         args = argparse.Namespace(sub="alice", expire=1)
         result = cmd_token(args)

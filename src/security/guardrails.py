@@ -9,26 +9,39 @@
     环境变量 / .env 配置 GUARDRAILS_ENABLED=true 开启
     默认启用基础规则，无需额外配置。
 """
+
 from __future__ import annotations
 
 import json
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
 from core.logger import logger
-
 
 # ── 默认规则库（中文 + 英文） ──
 
 _DEFAULT_BLACKLIST = [
     # 暴力 / 恐怖主义
-    "杀", "砍", "炸弹", "爆炸", "terrorist", "kill", "bomb",
+    "杀",
+    "砍",
+    "炸弹",
+    "爆炸",
+    "terrorist",
+    "kill",
+    "bomb",
     # 色情
-    "色情", "porn", "裸体", "nude", "sex", "性交",
+    "色情",
+    "porn",
+    "裸体",
+    "nude",
+    "sex",
+    "性交",
     # 政治敏感（简化示例，生产环境应接入专业 API）
-    "翻墙", "vpn", "法轮功", "falun",
+    "翻墙",
+    "vpn",
+    "法轮功",
+    "falun",
 ]
 
 _DEFAULT_PII_PATTERNS = {
@@ -49,6 +62,7 @@ _DEFAULT_PROMPT_INJECTION_PATTERNS = [
 
 
 # ── 数据模型 ──
+
 
 @dataclass
 class FilterResult:
@@ -142,6 +156,7 @@ class GuardrailConfig:
 
 
 # ── 核心引擎 ──
+
 
 class ContentGuardrails:
     """内容安全护栏引擎。
@@ -266,10 +281,7 @@ class ContentGuardrails:
 
     def _is_whitelisted(self, text: str) -> bool:
         """检查是否命中白名单（命中则跳过过滤）。"""
-        for pattern in self.config.whitelist_patterns:
-            if pattern.search(text):
-                return True
-        return False
+        return any(pattern.search(text) for pattern in self.config.whitelist_patterns)
 
     def _check_blacklist(self, text: str) -> str | None:
         """检查关键词黑名单，返回第一个命中的词。"""

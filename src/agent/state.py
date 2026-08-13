@@ -70,9 +70,7 @@ class AgentContext:
 
     def note(self, source: str, event: str, detail: Any = None) -> None:
         """记录流水线事件。"""
-        self.history.append(
-            {"source": source, "event": event, "detail": detail, "ts": time.time()}
-        )
+        self.history.append({"source": source, "event": event, "detail": detail, "ts": time.time()})
 
     def snapshot(self) -> dict[str, Any]:
         """返回当前上下文快照。"""

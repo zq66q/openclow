@@ -16,6 +16,7 @@ _VALID_WORKFLOWS = frozenset({"data_analysis", "code_review", "rag_qa"})
 
 def _get_svc() -> Any:
     from api.server import get_facade
+
     return get_facade()
 
 
@@ -57,6 +58,6 @@ async def run_workflow(req: WorkflowRunRequest) -> dict[str, Any]:
             "elapsed_ms": round(elapsed_ms, 1),
         }
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
