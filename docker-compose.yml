@@ -1,0 +1,112 @@
+# ============================================================
+# OpenClaw — Docker Compose 一键部署
+# ============================================================
+#
+# 使用:
+#   1. 复制 .env.example → .env 并填入实际值
+#   2. docker compose up -d
+#   3. docker compose logs -f 查看日志
+#   4. docker compose down -v 彻底停止（含数据卷）
+#
+# ============================================================
+
+version: "3.9"
+
+services:
+  # ── API 服务 ──
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+    image: openclaw:${OPENCLAW_VERSION:-latest}
+    container_name: openclaw-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      # 强制使用容器内路径
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - MEMORY_DB_PATH=/app/data/memory.db
+      - RAG_VECTOR_STORE_PATH=/app/data/vector_db
+      - FILE_SANDBOX_ROOT=/app/data/uploads
+      - AUDIT_LOG_PATH=/app/data/audit_logs
+    volumes:
+      # 数据持久化
+      - openclaw_data:/app/data
+      # 生产模式下只读挂载应用代码
+      # - ./src:/app/src:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "2G"
+        reservations:
+          cpus: "0.5"
+          memory: "512M"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - openclaw_net
+
+  # ── 前端 UI (可选) ──
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw:${OPENCLAW_VERSION:-latest}
+    container_name: openclaw-ui
+    restart: unless-stopped
+    profiles:
+      - full      # 仅 docker compose --profile full up 时启动
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    env_file:
+      - .env
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_HEADLESS=true
+      - OPENCLAW_API_URL=http://api:8000
+    volumes:
+      - openclaw_data:/app/data
+    command:
+      [
+        "python",
+        "-c",
+        "import sys; sys.path.insert(0,'.'); from ui.app import main; main()",
+      ]
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - openclaw_net
+
+volumes:
+  openclaw_data:
+    name: openclaw_data
+    driver: local
+
+networks:
+  openclaw_net:
+    name: openclaw_net
+    driver: bridge

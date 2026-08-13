@@ -1,0 +1,11 @@
+
+
+
+{
+  "dependencies": ["."],
+  "graphs": {
+    "openclaw": "./src/agent/graph.py:build_graph"
+  },
+  "env": ".env",
+  "python_dependency": "pyproject.toml"
+}

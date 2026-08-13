@@ -1,0 +1,115 @@
+#Python 项目配置与依赖管理
+
+[project]
+name = "openclaw"
+version = "0.1.0"
+description = "OpenClaw - 企业级多 Agent 业务自动化平台"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+
+[project.scripts]
+openclaw = "cli:main"
+
+dependencies = [
+    # LangChain / LangGraph 核心
+    "langchain>=0.3.0",
+    "langgraph>=0.2.0",
+    "langchain-openai>=0.2.0",
+    "langchain-community>=0.3.0",
+    "langsmith>=0.1.0",
+
+    # LLM 客户端
+    "openai>=1.50.0",
+    "httpx>=0.27.0",
+    "aiohttp>=3.9.0",
+
+    # MCP 协议
+    "mcp>=1.0.0",
+
+    # RAG 向量库与检索
+    "chromadb>=0.5.0",
+    "sentence-transformers>=3.0.0",
+    "rank-bm25>=0.2.0",
+
+    # 文档解析
+    "unstructured[all-docs]>=0.15.0",
+    "PyMuPDF>=1.24.0",
+    "python-docx>=1.1.0",
+    "openpyxl>=3.1.0",
+
+    # OCR 多模态
+    "pillow>=10.0.0",
+
+    # Web 框架
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sse-starlette>=2.1.0",
+    "streamlit>=1.40.0",
+
+    # 配置与数据校验
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "python-dotenv>=1.0.0",
+
+    # 日志与工具
+    "loguru>=0.7.0",
+    "tenacity>=9.0.0",
+    "jinja2>=3.1.0",
+
+    # 异步与缓存
+    "aiosqlite>=0.20.0",
+    "cachetools>=5.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # 测试
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+
+    # 代码质量
+    "ruff>=0.7.0",
+    "black>=24.10.0",
+    "mypy>=1.13.0",
+
+    # 开发工具
+    "jupyter>=1.1.0",
+    "ipython>=8.29.0",
+    "pre-commit>=4.0.0",
+]
+
+# ============================================================
+# 工具链配置
+# ============================================================
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --tb=short"

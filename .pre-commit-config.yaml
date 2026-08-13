@@ -1,0 +1,66 @@
+# ============================================================
+# OpenClaw — pre-commit hooks 配置
+# ============================================================
+# 安装:  pip install pre-commit && pre-commit install
+# 手动跑全部: pre-commit run --all-files
+# 跳过某 hook: git commit -m "xxx" --no-verify
+# ============================================================
+
+# 默认属性: 对所有文件运行
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  # ── 基础文件检查 ──
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace          # 去除行尾空格
+      - id: end-of-file-fixer            # 确保文件末尾有空行
+      - id: check-yaml                   # YAML 语法检查
+      - id: check-json                   # JSON 语法检查
+      - id: check-toml                   # TOML 语法检查
+      - id: check-merge-conflict         # 检查遗留的合并冲突标记
+      - id: check-added-large-files      # 禁止提交大文件 (>500KB)
+        args: ["--maxkb=500"]
+      - id: detect-private-key           # 检测是否提交了私钥
+      - id: check-case-conflict          # 检查文件名大小写冲突
+
+  # ── Python 代码格式化 (ruff) ──
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      # 自动修复 import 排序 + 代码问题
+      - id: ruff
+        name: ruff check (auto-fix)
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+
+      # 代码格式化
+      - id: ruff-format
+        name: ruff format
+        types_or: [python, pyi]
+
+  # ── 类型检查 (mypy) ──
+  # 注意: mypy 较慢，仅在 pre-push 阶段运行
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        name: mypy type check
+        additional_dependencies:
+          - pydantic>=2.9
+          - pydantic-settings>=2.6
+          - types-python-dateutil
+        args: [--ignore-missing-imports]
+        stages: [pre-push]
+        types_or: [python, pyi]
+
+  # ── 提交信息规范 (conventional commits) ──
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        name: conventional commit message
+        stages: [commit-msg]
+        args: []

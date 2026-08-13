@@ -1,0 +1,69 @@
+# ── Git ──
+.git
+.gitignore
+.gitattributes
+.github
+
+# ── Python ──
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+*.egg
+.eggs/
+dist/
+build/
+*.whl
+
+# ── 虚拟环境 ──
+.venv/
+venv/
+env/
+.env/
+.conda/
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── 数据目录（运行时挂载） ──
+data/
+
+# ── 环境变量 ──
+.env
+.env.*
+
+# ── 测试与开发 ──
+.pytest_cache/
+.pytest_cache
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.ruff_cache/
+.mypy_cache/
+*.benchmark
+
+# ── 文档 ──
+docs/_build/
+*.md
+!README.md
+!CHANGELOG.md
+
+# ── Docker ──
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# ── 操作系统 ──
+.DS_Store
+Thumbs.db
+
+# ── 日志 ──
+*.log
+logs/
