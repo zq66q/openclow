@@ -140,14 +140,24 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
         except Exception as exc:
             logger.warning(f"Auth middleware setup failed: {exc}")
 
-    # CORS
+    # CORS — 从环境变量读取允许的来源列表（逗号分隔）
+    # 生产环境务必设置 OPENCLAW_CORS_ORIGINS 为前端真实域名
+    _cors_origins = [
+        o.strip()
+        for o in os.getenv(
+            "OPENCLAW_CORS_ORIGINS",
+            "http://localhost:8501,http://127.0.0.1:8501,http://localhost:3000,http://127.0.0.1:3000",
+        ).split(",")
+        if o.strip()
+    ]
     _app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=_cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    logger.info(f"CORS allowed origins: {_cors_origins}")
 
     _started_at = time.time()
 
