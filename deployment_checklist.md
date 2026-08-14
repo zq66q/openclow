@@ -98,9 +98,9 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 
 ## 🟡 强烈建议补的（P2）
 
-### P2 `config/.env.example` 冗余
+### ✅ P2 `config/.env.example` 冗余
 
-根目录已有 `.env.example`，`config/.env.example` 内容重复且可能过期，容易误导。
+已删除 `config/.env.example`（整个 `config/` 目录唯一文件）。代码/文档无任何引用，根目录 `.env.example` 更完整且已包含限流、认证、CORS、域名等新变量。
 
 ### P2 `pyproject.toml` 作者是占位符
 
@@ -156,7 +156,7 @@ Dockerfile 有 `STOPSIGNAL SIGTERM`，但没有 `uvicorn` 的 `--graceful-timeou
 | P1 | 增加 Rate Limiting 中间件 | 防攻击 |
 | ~~P1~~ | ✅ ~~增加数据备份脚本 / 文档~~ | 数据安全 |
 | P1 | 增加 SQLite 迁移机制（Alembic） | 可升级 |
-| P2 | 删除/合并 `config/.env.example` | 减少误导 |
+| ✅ | ~~删除/合并 `config/.env.example`~~ | 已删除 |
 | P2 | 填写 `pyproject.toml` 作者信息 | 元数据完整 |
 | P2 | 写 `DEPLOYMENT.md` | 降低运维成本 |
 | P2 | 增加 Prometheus/结构化日志集成点 | 可观测性 |
