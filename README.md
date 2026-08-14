@@ -44,8 +44,8 @@ pip install -e .
 ```bash
 cp .env.example .env
 # 编辑 .env 填入 API Key:
-#   OPENCLAW_LLM_API_KEY=sk-...
-#   OPENCLAW_LLM_BASE_URL=https://api.openai.com/v1
+#   LLM_API_KEY=sk-...
+#   LLM_BASE_URL=https://api.openai.com/v1
 ```
 
 ### 3. 启动服务
@@ -172,14 +172,14 @@ openclaw/
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `OPENCLAW_LLM_API_KEY` | LLM API Key | (必填) |
-| `OPENCLAW_LLM_BASE_URL` | LLM API 地址 | `https://api.openai.com/v1` |
-| `OPENCLAW_LLM_MODEL` | 默认模型 | `gpt-4o-mini` |
+| `LLM_API_KEY` | LLM API Key | (必填) |
+| `LLM_BASE_URL` | LLM API 地址 | `https://api.openai.com/v1` |
+| `LLM_MODEL` | 默认模型 | `gpt-4o-mini` |
 | `OPENCLAW_AUTH_MODE` | 认证模式: apikey/jwt/both/none | `apikey` |
 | `OPENCLAW_API_KEYS` | 合法 API Key（逗号分隔） | (空) |
 | `OPENCLAW_JWT_SECRET` | JWT 签名密钥 | (空) |
-| `OPENCLAW_MEMORY_DB` | 记忆数据库路径 | `./data/memory.db` |
-| `OPENCLAW_RAG_DIR` | RAG 持久化目录 | `./data/rag` |
+| `MEMORY_DB_PATH` | 记忆数据库路径 | `./data/memory.db` |
+| `RAG_VECTOR_STORE_PATH` | RAG 向量库路径 | `./data/vector_db` |
 
 ## 测试
 

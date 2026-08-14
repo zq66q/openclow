@@ -192,4 +192,4 @@ class TestModulePaths:
         root = Path(__file__).resolve().parent.parent.parent
         content = (root / ".env.example").read_text(encoding="utf-8")
         assert "OPENCLAW_API_KEYS" in content
-        assert "OPENAI_API_KEY" in content
+        assert "LLM_API_KEY" in content
