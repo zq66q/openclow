@@ -140,6 +140,15 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
         except Exception as exc:
             logger.warning(f"Auth middleware setup failed: {exc}")
 
+    # ── 限流中间件（放在认证外层：未认证请求同样计数，防暴力破解） ──
+    try:
+        from api.rate_limit import RateLimitMiddleware
+
+        _app.add_middleware(RateLimitMiddleware)
+        logger.info("Rate limiting enabled")
+    except Exception as exc:
+        logger.warning(f"Rate limit middleware setup failed: {exc}")
+
     # CORS — 从环境变量读取允许的来源列表（逗号分隔）
     # 生产环境务必设置 OPENCLAW_CORS_ORIGINS 为前端真实域名
     _cors_origins = [
