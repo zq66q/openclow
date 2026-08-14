@@ -87,6 +87,8 @@ docker compose -f docker-compose.prod.yml --profile full up -d # 含 Web UI
 #    UI:  https://app.your-domain.com
 ```
 
+> 生产部署的完整指南（环境变量清单、安全基线、升级/回滚、备份恢复、故障排查）见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。
+
 ### 5. 数据库迁移
 
 项目使用 [Alembic](https://alembic.sqlalchemy.org/) 管理主库 `data/memory.db`（记忆 + 会话表）的 schema 版本，升级应用前先执行迁移：

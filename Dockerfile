@@ -50,8 +50,9 @@ RUN python -m venv /opt/venv && \
     else \
         /opt/venv/bin/pip install .; \
     fi \
-    && /opt/venv/bin/pip uninstall -y openclaw \
     && echo "Dependencies installed."
+    # 注意: 不要 pip uninstall openclaw —— 那会同时删除 /opt/venv/bin/openclaw
+    # 入口脚本，导致 CMD ["openclaw", ...] 启动即失败。
 
 
 # ── Stage 2: 生产运行时 ──
@@ -74,9 +75,12 @@ RUN groupadd -r openclaw -g 1000 && \
 
 # 复制虚拟环境
 COPY --from=builder /opt/venv /opt/venv
+# PYTHONPATH 指向 /app: cli 模块位于项目根（非包内），console script 入口
+# `openclaw` 运行时需要 import cli；cli.py 内部会再注入 /app/src。
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH="/app"
 
 # 复制应用代码
 WORKDIR /app

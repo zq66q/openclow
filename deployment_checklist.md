@@ -121,13 +121,21 @@ authors = [
 
 发布到 PyPI 或 Docker Hub 会很难看。
 
-### P2 缺少生产运维文档
+### ✅ P2 缺少生产运维文档
 
-没有：
-- `DEPLOYMENT.md` 或 `docs/deployment.md`
-- 环境变量完整清单和示例
-- 升级/回滚步骤
-- 监控告警方案
+已新增 [`DEPLOYMENT.md`](DEPLOYMENT.md)，覆盖：
+- 架构概览与前置条件
+- 首次部署步骤、环境变量完整清单
+- 认证/安全基线、升级/回滚流程
+- Docker 场景备份与恢复（含 cron）
+- 日志、健康检查、故障排查、性能调优、运维速查
+
+### ✅ 顺带修复: Dockerfile 的 `openclaw` 入口失效 bug
+
+验证发现 `pip install .` 后 `pip uninstall -y openclaw` 会删除 `/opt/venv/bin/openclaw` 入口脚本，且 `cli` 模块位于项目根（不在安装的 src-layout 包内），导致 `CMD ["openclaw", ...]` 启动即失败。修复：
+- 删除 `pip uninstall -y openclaw` 行
+- 运行时 `ENV PYTHONPATH="/app"`，使 console script 能 `import cli`
+- 已在等价模拟环境验证 `openclaw --help` 与 `import cli/api.server/business.service_facade` 均正常
 
 ### P2 没有集中式日志 / 指标
 
@@ -167,7 +175,7 @@ Dockerfile 有 `STOPSIGNAL SIGTERM`，但没有 `uvicorn` 的 `--graceful-timeou
 | ~~P1~~ | ✅ ~~增加 SQLite 迁移机制（Alembic）~~ | 可升级 |
 | ✅ | ~~删除/合并 `config/.env.example`~~ | 已删除 |
 | P2 | 填写 `pyproject.toml` 作者信息 | 元数据完整 |
-| P2 | 写 `DEPLOYMENT.md` | 降低运维成本 |
+| ✅ | ~~写 `DEPLOYMENT.md`~~ | 已交付 |
 | P2 | 增加 Prometheus/结构化日志集成点 | 可观测性 |
 
 ## 总体评估
