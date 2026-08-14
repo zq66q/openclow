@@ -160,6 +160,8 @@ docker compose -f docker-compose.prod.yml --profile full up -d --build
 | `ALLOWED_FILE_EXTENSIONS` | `pdf,docx,...` | 允许上传的类型白名单 |
 | `MAX_UPLOAD_SIZE_MB` | `10` | 上传大小上限 |
 | `AUDIT_LOG_LEVEL` | `INFO` | 审计日志级别 |
+| `OPENCLAW_LOG_FORMAT` | `text` | 控制台日志格式：`text`（彩色） / `json`（结构化，容器内采集推荐） |
+| `OPENCLAW_METRICS_ENABLED` | `true` | Prometheus `/metrics` 开关，`false` 关闭 |
 
 ---
 
@@ -335,6 +337,15 @@ docker compose -f docker-compose.prod.yml exec api \
   sh -c 'ls -lh /app/data/audit_logs && tail -5 /app/data/audit_logs/*.jsonl'
 ```
 
+**结构化日志**：设置 `OPENCLAW_LOG_FORMAT=json` 后，控制台/容器 stdout 也输出逐行 JSON（含 `trace_id`），可直接被 Loki/ELK 等采集器消费：
+
+```bash
+# 生产 compose 中开启（在 api 服务的 environment 下加一行）
+#   - OPENCLAW_LOG_FORMAT=json
+docker compose -f docker-compose.prod.yml exec api sh -c \
+  'tail -3 /proc/1/fd/1 2>/dev/null || true'
+```
+
 日志轮转参数已在 compose 中配置（`max-size: 10m`、`max-file: 3`），无需额外处理。审计日志是文件形式，长期会增长，建议纳入备份并在日志量大的场景接入集中式采集（ELK/Loki，P2 可观测性项）。
 
 ---
@@ -359,14 +370,21 @@ curl -sf https://api.你的域名/health
 | 能力 | 现状 |
 |------|------|
 | 链路追踪 | 已接入 LangSmith（`LANGCHAIN_TRACING_V2=true` + API Key） |
-| 审计日志 | 本地 jsonl，可采集 |
+| 审计日志 | 本地 jsonl，可采集；`OPENCLAW_LOG_FORMAT=json` 可让 stdout 也输出 JSON |
 | 进程/容器监控 | Docker `stats` / `docker ps` 人工查看 |
-| 指标与告警 | **未接入**（P2）：建议外部探活（如 UptimeRobot / 云监控 HTTP 探针）盯 `/health`；关键业务量后续可接 Prometheus/Grafana |
+| 指标 | 已内置 `/metrics`（Prometheus 文本格式）：HTTP 请求数/耗时直方图、活跃流式连接数、运行时长；免认证白名单 |
 
 ```bash
+# 查看内置指标
+curl -s http://localhost:8000/metrics | head -30
+
 # 快速看资源占用
 docker stats --no-stream
 ```
+
+建议生产接入：
+- 外部探活（UptimeRobot / 云监控 HTTP 探针）盯 `/health`，异常告警
+- Prometheus + Grafana 抓取 `/metrics`（docker-compose 加 `prom/prometheus` + `grafana/grafana` 服务即可）
 
 ---
 

@@ -111,15 +111,9 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 
 已删除 `config/.env.example`（整个 `config/` 目录唯一文件）。代码/文档无任何引用，根目录 `.env.example` 更完整且已包含限流、认证、CORS、域名等新变量。
 
-### P2 `pyproject.toml` 作者是占位符
+### ✅ P2 `pyproject.toml` 作者是占位符
 
-```toml
-authors = [
-    { name = "Your Name", email = "your.email@example.com" }
-]
-```
-
-发布到 PyPI 或 Docker Hub 会很难看。
+已填写为 `zq66q <zq66q@users.noreply.github.com>`（commit `e5620b0` 时同步更新）。
 
 ### ✅ P2 缺少生产运维文档
 
@@ -137,20 +131,25 @@ authors = [
 - 运行时 `ENV PYTHONPATH="/app"`，使 console script 能 `import cli`
 - 已在等价模拟环境验证 `openclaw --help` 与 `import cli/api.server/business.service_facade` 均正常
 
-### P2 没有集中式日志 / 指标
+### ✅ P2 没有集中式日志 / 指标
 
-- 审计日志写到本地文件，生产难以聚合
-- 没有 Prometheus / Grafana 指标
-- 没有结构化日志（JSON）开关
-- 没有错误追踪（Sentry）集成点
+已提供可观测性基础（零新增依赖）：
+- **Prometheus `/metrics`**：`src/api/metrics.py` 内置采集器（Prometheus 文本格式），HTTP 请求计数 / 耗时直方图、活跃流式连接数、运行时长；`OPENCLAW_METRICS_ENABLED=false` 可关闭；`/metrics` 已加入认证白名单
+- **结构化日志**：`OPENCLAW_LOG_FORMAT=json` 让控制台输出 JSON（容器内易被采集）；文件日志本就是 JSONL
+- SSE 流端点已接入 `StreamCounter` 统计活跃连接
+- 测试：`tests/unit/test_metrics.py` 6 项
+- 剩余可选：错误追踪（Sentry）集成、日志聚合（Loki/ELK）
 
 ### P2 WebSocket / SSE 没有连接数限制
 
 生产直接暴露，长连接可能把服务器拖垮。
 
-### P2 没有 graceful shutdown 超时配置
+### ✅ P2 没有 graceful shutdown 超时配置
 
-Dockerfile 有 `STOPSIGNAL SIGTERM`，但没有 `uvicorn` 的 `--graceful-timeout` 配置。
+已在启动链路加入优雅停机超时：
+- `src/api/server.py` 的 `start()` 新增 `timeout_graceful_shutdown`（默认 30s，None/0 不限时）与 `workers` 透传
+- `cli.py` 的 `serve` 子命令新增 `--graceful-timeout`（默认 30，0 表示不限时）
+- `Dockerfile` 的 `CMD` 显式传 `--graceful-timeout 30`，配合 `STOPSIGNAL SIGTERM`，滚动升级时最多等 30s 让在途请求收尾
 
 ## 🔵 可以后续再做的（P3）
 
@@ -174,9 +173,10 @@ Dockerfile 有 `STOPSIGNAL SIGTERM`，但没有 `uvicorn` 的 `--graceful-timeou
 | ~~P1~~ | ✅ ~~增加数据备份脚本 / 文档~~ | 数据安全 |
 | ~~P1~~ | ✅ ~~增加 SQLite 迁移机制（Alembic）~~ | 可升级 |
 | ✅ | ~~删除/合并 `config/.env.example`~~ | 已删除 |
-| P2 | 填写 `pyproject.toml` 作者信息 | 元数据完整 |
+| ✅ | ~~填写 `pyproject.toml` 作者信息~~ | 已填写（e5620b0） |
 | ✅ | ~~写 `DEPLOYMENT.md`~~ | 已交付 |
-| P2 | 增加 Prometheus/结构化日志集成点 | 可观测性 |
+| ✅ | ~~优雅停机超时配置~~ | 已加 `--graceful-timeout` |
+| ✅ | ~~Prometheus/结构化日志集成点~~ | 已加 `/metrics` + JSON 日志开关 |
 
 ## 总体评估
 

@@ -62,30 +62,33 @@ async def chat_stream(req: ChatRequest) -> StreamingResponse:
         raise HTTPException(status_code=501, detail="Streaming not available — master_agent_chat_stream not found")
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        try:
-            for event in svc.master_agent_chat_stream(query=req.query):
-                # 映射内部事件类型到 API 事件类型
-                evt_type = event.get("type", "")
+        from api.metrics import StreamCounter
 
-                if evt_type == "_done":
-                    yield f"data: {json.dumps({'type': 'done', 'answer': event['answer'], 'elapsed_ms': event['elapsed_ms'], 'steps': event.get('steps', [])}, ensure_ascii=False)}\n\n"
-                    break
-                elif evt_type == "_error":
-                    yield f"data: {json.dumps({'type': 'error', 'error': event['error']}, ensure_ascii=False)}\n\n"
-                    break
-                elif evt_type == "think":
-                    yield f"data: {json.dumps({'type': 'think', 'thought': event.get('thought', ''), 'tool': event.get('tool', ''), 'task': event.get('task', '')}, ensure_ascii=False)}\n\n"
-                elif evt_type == "delegate":
-                    yield f"data: {json.dumps({'type': 'delegate', 'tool': event.get('tool', ''), 'task': event.get('task', '')}, ensure_ascii=False)}\n\n"
-                elif evt_type == "tool_result":
-                    result_text = str(event.get("result", ""))[:500]
-                    yield f"data: {json.dumps({'type': 'tool_result', 'tool': event.get('tool', ''), 'result': result_text, 'elapsed_ms': event.get('elapsed_ms', 0)}, ensure_ascii=False)}\n\n"
-                elif evt_type == "waiting":
-                    yield f"data: {json.dumps({'type': 'heartbeat'}, ensure_ascii=False)}\n\n"
-                else:
-                    yield f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
-        except Exception as exc:
-            yield f"data: {json.dumps({'type': 'error', 'error': str(exc)}, ensure_ascii=False)}\n\n"
+        with StreamCounter():
+            try:
+                for event in svc.master_agent_chat_stream(query=req.query):
+                    # 映射内部事件类型到 API 事件类型
+                    evt_type = event.get("type", "")
+
+                    if evt_type == "_done":
+                        yield f"data: {json.dumps({'type': 'done', 'answer': event['answer'], 'elapsed_ms': event['elapsed_ms'], 'steps': event.get('steps', [])}, ensure_ascii=False)}\n\n"
+                        break
+                    elif evt_type == "_error":
+                        yield f"data: {json.dumps({'type': 'error', 'error': event['error']}, ensure_ascii=False)}\n\n"
+                        break
+                    elif evt_type == "think":
+                        yield f"data: {json.dumps({'type': 'think', 'thought': event.get('thought', ''), 'tool': event.get('tool', ''), 'task': event.get('task', '')}, ensure_ascii=False)}\n\n"
+                    elif evt_type == "delegate":
+                        yield f"data: {json.dumps({'type': 'delegate', 'tool': event.get('tool', ''), 'task': event.get('task', '')}, ensure_ascii=False)}\n\n"
+                    elif evt_type == "tool_result":
+                        result_text = str(event.get("result", ""))[:500]
+                        yield f"data: {json.dumps({'type': 'tool_result', 'tool': event.get('tool', ''), 'result': result_text, 'elapsed_ms': event.get('elapsed_ms', 0)}, ensure_ascii=False)}\n\n"
+                    elif evt_type == "waiting":
+                        yield f"data: {json.dumps({'type': 'heartbeat'}, ensure_ascii=False)}\n\n"
+                    else:
+                        yield f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
+            except Exception as exc:
+                yield f"data: {json.dumps({'type': 'error', 'error': str(exc)}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         event_generator(),

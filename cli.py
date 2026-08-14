@@ -78,7 +78,14 @@ def cmd_serve(args: argparse.Namespace) -> int:
     _print("Press Ctrl+C to stop\n")
 
     try:
-        start(host=args.host, port=args.port, reload=args.reload, facade=facade)
+        start(
+            host=args.host,
+            port=args.port,
+            reload=args.reload,
+            facade=facade,
+            workers=args.workers,
+            timeout_graceful_shutdown=args.graceful_timeout,
+        )
     except KeyboardInterrupt:
         _print("\nShutting down...")
     finally:
@@ -219,6 +226,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_serve.add_argument("--port", type=int, default=8000, help="监听端口 (默认: 8000)")
     p_serve.add_argument("--reload", action="store_true", help="开发模式热重载")
     p_serve.add_argument("--workers", type=int, default=1, help="工作进程数 (仅生产)")
+    p_serve.add_argument(
+        "--graceful-timeout",
+        type=int,
+        default=30,
+        help="优雅停机超时秒数，等待在途请求完成 (默认: 30，0 表示不限时)",
+    )
 
     # check
     p_check = sub.add_parser("check", help="运行健康检查")

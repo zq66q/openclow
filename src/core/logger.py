@@ -39,20 +39,27 @@ def init_logger(
 ) -> None:
     """初始化日志系统.
 
-    控制台：彩色文本格式，便于开发查看
-    文件：JSON 格式，便于审计分析
+    控制台：彩色文本格式，便于开发查看；
+    `OPENCLAW_LOG_FORMAT=json` 时控制台输出 JSON（便于容器内被采集）。
+    文件：JSON 格式（serialize=True），便于审计分析。
     """
+    import os
+
+    console_json = os.getenv("OPENCLAW_LOG_FORMAT", "text").strip().lower() == "json"
     logger.remove()
 
     # 控制台输出
-    console_fmt = (
-        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-        "<level>{level: <8}</level> | "
-        "<cyan>{extra[trace_id]}</cyan> | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
-        "<level>{message}</level>"
-    )
-    logger.add(sys.stdout, level=log_level, format=console_fmt, filter=_TraceIdFilter())
+    if console_json:
+        logger.add(sys.stdout, level=log_level, serialize=True, filter=_TraceIdFilter())
+    else:
+        console_fmt = (
+            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+            "<level>{level: <8}</level> | "
+            "<cyan>{extra[trace_id]}</cyan> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+            "<level>{message}</level>"
+        )
+        logger.add(sys.stdout, level=log_level, format=console_fmt, filter=_TraceIdFilter())
 
     # JSON 审计日志文件
     if log_dir:

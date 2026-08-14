@@ -120,8 +120,8 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
 
             class AuthMiddleware(BaseHTTPMiddleware):
                 async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Any:
-                    # 白名单: health 和 docs 端点免认证
-                    if request.url.path in ("/health", "/docs", "/openapi.json", "/redoc"):
+                    # 白名单: health / metrics / docs 端点免认证
+                    if request.url.path in ("/health", "/metrics", "/docs", "/openapi.json", "/redoc"):
                         return await call_next(request)
                     try:
                         auth_guard(request)
@@ -148,6 +148,17 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
         logger.info("Rate limiting enabled")
     except Exception as exc:
         logger.warning(f"Rate limit middleware setup failed: {exc}")
+
+    # ── 指标采集中间件（Prometheus /metrics） ──
+    _metrics_enabled = os.getenv("OPENCLAW_METRICS_ENABLED", "true").strip().lower() != "false"
+    if _metrics_enabled:
+        try:
+            from api.metrics import MetricsMiddleware
+
+            _app.add_middleware(MetricsMiddleware)
+            logger.info("Metrics middleware enabled")
+        except Exception as exc:
+            logger.warning(f"Metrics middleware setup failed: {exc}")
 
     # CORS — 从环境变量读取允许的来源列表（逗号分隔）
     # 生产环境务必设置 OPENCLAW_CORS_ORIGINS 为前端真实域名
@@ -199,6 +210,15 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
             "components": report.components,
         }
 
+    # ── Prometheus 指标（/metrics） ──
+    if _metrics_enabled:
+        try:
+            from api.metrics import metrics_endpoint
+
+            _app.get("/metrics")(metrics_endpoint())
+            logger.info("Metrics endpoint registered at /metrics")
+        except Exception as exc:
+            logger.warning(f"Metrics endpoint setup failed: {exc}")
     # ── WebSocket 流式对话 ──
 
     _HEARTBEAT_INTERVAL = 30.0  # 秒
@@ -416,6 +436,8 @@ def start(
     port: int = 8000,
     reload: bool = False,
     facade: Any = None,
+    workers: int = 1,
+    timeout_graceful_shutdown: int | None = 30,
 ) -> None:
     """启动 FastAPI 服务。
 
@@ -424,14 +446,28 @@ def start(
         port: 监听端口
         reload: 是否热重载
         facade: ServiceFacade 实例
+        workers: 工作进程数（生产多进程；reload 模式不可用）
+        timeout_graceful_shutdown: 优雅停机超时秒数，留给在途请求收尾，None 表示不限时
     """
     if not _HAS_UVICORN:
         logger.error("uvicorn not installed — cannot start server")
         return
 
+    if reload and workers > 1:
+        logger.warning("workers 与 reload 互斥，已强制 workers=1")
+        workers = 1
+
     app = create_app(facade=facade)
-    logger.info(f"Starting API server on {host}:{port}")
-    uvicorn.run(app, host=host, port=port, reload=reload, log_level="info")
+    logger.info(f"Starting API server on {host}:{port} (workers={workers})")
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        reload=reload,
+        workers=workers,
+        timeout_graceful_shutdown=timeout_graceful_shutdown,
+        log_level="info",
+    )
 
 
 # ── 占位（无 FastAPI 时） ──
