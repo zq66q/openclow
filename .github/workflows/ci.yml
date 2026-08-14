@@ -67,7 +67,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,rag]"
 
       - name: ruff check
         run: ruff check src/ tests/ cli.py
@@ -105,7 +105,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,rag]"
 
       - name: Run tests with coverage
         run: pytest tests/ --cov=src --cov-report=xml --cov-report=term-missing -q
@@ -141,7 +141,6 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             -t ${{ env.IMAGE_NAME }}:${{ github.sha }} \
@@ -157,7 +156,7 @@ jobs:
         run: |
           # 启动容器并检查健康检查
           docker run -d --name test-api -p 8000:8000 \
-            -e OPENAI_API_KEY=mock \
+            -e LLM_API_KEY=mock \
             -e OPENCLAW_AUTH_MODE=none \
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
           sleep 5

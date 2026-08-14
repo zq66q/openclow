@@ -37,6 +37,8 @@
 git clone https://github.com/your-org/openclaw.git
 cd openclaw
 pip install -e .
+# 如需文档解析功能（PDF/Word/PPT/Excel/HTML），额外安装:
+pip install -e ".[rag]"
 ```
 
 ### 2. 配置

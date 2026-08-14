@@ -37,42 +37,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # 安装依赖到虚拟环境
+# 依赖清单来自 pyproject.toml（单一事实来源），避免与 Dockerfile 硬编码清单漂移
 WORKDIR /app
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 
-# 创建 venv 并安装核心依赖
+# 创建 venv 并安装依赖（核心依赖；INSTALL_EXTRAS=true 时额外安装文档解析等重型依赖）
 ARG INSTALL_EXTRAS=false
 RUN python -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip setuptools wheel && \
-    /opt/venv/bin/pip install \
-    langchain \
-    langgraph \
-    langchain-openai \
-    langchain-community \
-    langsmith \
-    openai \
-    httpx \
-    aiohttp \
-    chromadb \
-    "sentence-transformers>=3.0" \
-    rank-bm25 \
-    "pydantic>=2.9" \
-    "pydantic-settings>=2.6" \
-    python-dotenv \
-    loguru \
-    tenacity \
-    jinja2 \
-    aiosqlite \
-    cachetools \
-    "fastapi>=0.115" \
-    "uvicorn[standard]>=0.32" \
-    sse-starlette \
-    mcp \
-    PyJWT \
-    "streamlit>=1.40" \
-    && if [ "$INSTALL_EXTRAS" = "true" ]; then \
-         /opt/venv/bin/pip install "unstructured[all-docs]" PyMuPDF python-docx openpyxl pillow; \
-       fi \
+    if [ "$INSTALL_EXTRAS" = "true" ]; then \
+        /opt/venv/bin/pip install ".[rag]"; \
+    else \
+        /opt/venv/bin/pip install .; \
+    fi \
+    && /opt/venv/bin/pip uninstall -y openclaw \
     && echo "Dependencies installed."
 
 
