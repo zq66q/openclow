@@ -62,9 +62,27 @@ python -m uvicorn api.server:create_app --factory --reload
 
 ### 4. Docker 部署
 
+**本地开发：**
+
 ```bash
 docker compose up -d          # API 服务
 docker compose --profile full up -d   # API + Web UI
+```
+
+**生产部署（HTTPS）：**
+
+```bash
+# 1. 设置域名（A 记录指向服务器，80/443 端口开放）
+#    在 .env 中配置 OPENCLAW_DOMAIN=your-domain.com
+cp .env.example .env
+
+# 2. 启动（Caddy 自动签发 HTTPS 证书）
+docker compose -f docker-compose.prod.yml up -d                # API + 反向代理
+docker compose -f docker-compose.prod.yml --profile full up -d # 含 Web UI
+
+# 3. 访问
+#    API: https://api.your-domain.com/docs
+#    UI:  https://app.your-domain.com
 ```
 
 ## 核心功能

@@ -1,0 +1,139 @@
+# ============================================================
+# OpenClaw — 生产部署 (Docker Compose)
+# ============================================================
+# 与 docker-compose.yml（本地开发）的区别:
+#   - 增加 Caddy 反向代理，自动 HTTPS，不直接暴露 8000/8501 到公网
+#   - 仅通过 80/443 对外提供服务
+#
+# 用法:
+#   1. cp .env.example .env 并填写真实配置
+#   2. 设置 OPENCLAW_DOMAIN（如 example.com）并解析 A 记录
+#   3. docker compose -f docker-compose.prod.yml up -d          # API + 反代
+#   4. docker compose -f docker-compose.prod.yml --profile full up -d   # 含 Web UI
+#
+# 升级/回滚: 修改 OPENCLAW_VERSION 后重新 up 即可
+# 查看日志: docker compose -f docker-compose.prod.yml logs -f
+# ============================================================
+
+services:
+  # ── 反向代理 + HTTPS ──
+  caddy:
+    image: caddy:2-alpine
+    container_name: openclaw-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - OPENCLAW_DOMAIN=${OPENCLAW_DOMAIN:-openclaw.example.com}
+      - OPENCLAW_API_UPSTREAM=api:8000
+      - OPENCLAW_UI_UPSTREAM=ui:8501
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - openclaw_prod_net
+
+  # ── API 服务（仅内网可达，不暴露端口）──
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw:${OPENCLAW_VERSION:-latest}
+    container_name: openclaw-api
+    restart: unless-stopped
+    expose:
+      - "8000"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      # 容器内固定路径（与 .env 的相对路径解耦）
+      - MEMORY_DB_PATH=/app/data/memory.db
+      - RAG_VECTOR_STORE_PATH=/app/data/vector_db
+      - FILE_SANDBOX_ROOT=/app/data/uploads
+      - AUDIT_LOG_PATH=/app/data/audit_logs
+    volumes:
+      - openclaw_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "2G"
+        reservations:
+          cpus: "0.5"
+          memory: "512M"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - openclaw_prod_net
+
+  # ── Web UI（可选，--profile full 时启动）──
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw:${OPENCLAW_VERSION:-latest}
+    container_name: openclaw-ui
+    restart: unless-stopped
+    profiles:
+      - full
+    expose:
+      - "8501"
+    env_file:
+      - .env
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_HEADLESS=true
+      - OPENCLAW_API_URL=http://api:8000
+    volumes:
+      - openclaw_data:/app/data
+    command:
+      [
+        "python",
+        "-c",
+        "import sys; sys.path.insert(0,'.'); from ui.app import main; main()",
+      ]
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - openclaw_prod_net
+
+volumes:
+  openclaw_data:
+    name: openclaw_data
+  caddy_data:
+    name: caddy_data
+  caddy_config:
+    name: caddy_config
+
+networks:
+  openclaw_prod_net:
+    name: openclaw_prod_net
+    driver: bridge

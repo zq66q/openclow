@@ -1,0 +1,40 @@
+# ============================================================
+# OpenClaw — 生产反向代理 (Caddy)
+# ============================================================
+# 自动 HTTPS (Let's Encrypt)，无需手动管理证书。
+#
+# 用法:
+#   1. 域名解析: 将 api.<域名> 和 app.<域名> 的 A 记录指向服务器公网 IP
+#   2. 确保服务器 80/443 端口可从公网访问（证书签发需要）
+#   3. docker compose -f docker-compose.prod.yml up -d
+#
+# 域名通过环境变量 OPENCLAW_DOMAIN 传入（见 .env.example）。
+# 本地联调（无公网域名）时，可在每个 site 块中加入: tls internal
+# ============================================================
+
+# 根域名 -> 重定向到 Web UI 子域名
+{$OPENCLAW_DOMAIN:openclaw.example.com} {
+    redir https://app.{$OPENCLAW_DOMAIN:openclaw.example.com}{uri} permanent
+}
+
+# API 子域名 -> FastAPI (含 WebSocket / SSE)
+api.{$OPENCLAW_DOMAIN:openclaw.example.com} {
+    encode gzip
+
+    # 基础安全响应头
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # 反向代理到 API 容器（支持 WebSocket 自动升级、SSE 流式响应）
+    reverse_proxy {$OPENCLAW_API_UPSTREAM:api:8000}
+}
+
+# Web UI 子域名 -> Streamlit
+app.{$OPENCLAW_DOMAIN:openclaw.example.com} {
+    encode gzip
+
+    reverse_proxy {$OPENCLAW_UI_UPSTREAM:ui:8501}
+}
