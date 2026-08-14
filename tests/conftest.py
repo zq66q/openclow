@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import tempfile
 from collections.abc import Generator
+from contextlib import suppress
 from typing import Any
 
 try:
@@ -78,7 +79,14 @@ if pytest is not None:
 
     @pytest.fixture(autouse=True)
     def _patch_env(monkeypatch: Any) -> None:
-        """自动清理环境变量，避免测试互相污染。"""
+        """自动清理环境变量，避免测试互相污染。
+
+        注意：core.settings 的 load_dotenv(override=True) 只在 import 时执行一次，
+        会用 .env 强制覆盖已有变量。因此先触发该 import，再设置测试用值，
+        否则 .env 中的 OPENCLAW_AUTH_MODE 等会污染所有测试。
+        """
+        with suppress(Exception):
+            import core.settings  # noqa: F401
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("OPENCLAW_LLM_API_KEY", raising=False)
         monkeypatch.setenv("OPENCLAW_AUTH_MODE", "none")

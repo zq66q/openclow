@@ -140,9 +140,14 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 - 测试：`tests/unit/test_metrics.py` 6 项
 - 剩余可选：错误追踪（Sentry）集成、日志聚合（Loki/ELK）
 
-### P2 WebSocket / SSE 没有连接数限制
+### ✅ P2 WebSocket / SSE 没有连接数限制
 
-生产直接暴露，长连接可能把服务器拖垮。
+已实现并发上限：
+- `src/api/metrics.py` 的 `Metrics` 新增 `max_streams`（`OPENCLAW_MAX_STREAMS` 环境变量，默认 64，`0` 表示不限）与 `try_enter_stream()`；被拒连接计入 `openclaw_streams_rejected_total` 指标
+- `StreamCounter` 提供 `try_enter()` / `release()`（幂等），SSE 与 WebSocket 共享同一配额
+- `/chat/stream` 超限返回 `503`；`/chat/ws` 超限先发 error 再以 `code 1013` 关闭
+- 测试：`tests/unit/test_metrics.py` 的 `TestStreamLimit` 4 项（含 SSE 503 / WS 1013 集成测试）
+- 修复：`tests/conftest.py` 的 `_patch_env` 先触发 `core.settings` 的一次性 `load_dotenv(override=True)`，避免 `.env` 污染测试环境
 
 ### ✅ P2 没有 graceful shutdown 超时配置
 
@@ -177,6 +182,7 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 | ✅ | ~~写 `DEPLOYMENT.md`~~ | 已交付 |
 | ✅ | ~~优雅停机超时配置~~ | 已加 `--graceful-timeout` |
 | ✅ | ~~Prometheus/结构化日志集成点~~ | 已加 `/metrics` + JSON 日志开关 |
+| ✅ | ~~WebSocket/SSE 连接数限制~~ | 已加 `OPENCLAW_MAX_STREAMS`（默认 64）|
 
 ## 总体评估
 

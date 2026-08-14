@@ -272,19 +272,33 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
                 await websocket.close(code=4001, reason="Auth error")
                 return
 
+        # 并发流式连接数限制（OPENCLAW_MAX_STREAMS，默认 64）— 与 SSE 共享同一配额
+        from api.metrics import StreamCounter
+
+        ws_counter = StreamCounter()
+        if not ws_counter.try_enter():
+            await websocket.send_json({"type": "error", "message": "Too many concurrent connections, try again later"})
+            await websocket.close(code=1013, reason="Too many concurrent connections")
+            return
+
         # 发送连接确认
-        await websocket.send_json(
-            {
-                "type": "connected",
-                "scenarios": [
-                    "general_assistant",
-                    "rag_customer_service",
-                    "data_analyst",
-                    "code_reviewer",
-                ],
-                "auth_mode": auth_mode,
-            }
-        )
+        try:
+            await websocket.send_json(
+                {
+                    "type": "connected",
+                    "scenarios": [
+                        "general_assistant",
+                        "rag_customer_service",
+                        "data_analyst",
+                        "code_reviewer",
+                    ],
+                    "auth_mode": auth_mode,
+                }
+            )
+        except Exception as exc:
+            logger.warning(f"WS connect message failed: {exc}")
+            ws_counter.release()
+            return
 
         # 心跳任务
         heartbeat_running = True
@@ -298,7 +312,11 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
                     except Exception:
                         break
 
-        heartbeat_task = asyncio.create_task(heartbeat_loop())
+        try:
+            heartbeat_task = asyncio.create_task(heartbeat_loop())
+        except Exception:
+            ws_counter.release()
+            raise
 
         try:
             while True:
@@ -424,6 +442,7 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
             heartbeat_task.cancel()
             with suppress(asyncio.CancelledError):
                 await heartbeat_task
+            ws_counter.release()
 
     return _app
 

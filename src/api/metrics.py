@@ -11,6 +11,7 @@ Prometheus / Grafana / VictoriaMetrics 抓取。
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from typing import Any
@@ -20,11 +21,25 @@ _BUCKETS: tuple[float, ...] = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.
 
 _METRICS_ENABLED = True
 
+# 流式连接（SSE / WebSocket）并发上限，0 表示不限
+_STREAM_LIMIT_ENV = "OPENCLAW_MAX_STREAMS"
+_DEFAULT_MAX_STREAMS = 64
+
+
+def _resolve_max_streams(env_value: str | None) -> int:
+    """解析流式连接上限：非法值回退默认，0 表示不限制。"""
+    if env_value is None:
+        return _DEFAULT_MAX_STREAMS
+    try:
+        return max(0, int(env_value))
+    except (TypeError, ValueError):
+        return _DEFAULT_MAX_STREAMS
+
 
 class Metrics:
     """进程内指标收集器，线程安全。"""
 
-    def __init__(self) -> None:
+    def __init__(self, max_streams: int | None = None) -> None:
         self._lock = threading.Lock()
         self._started = time.time()
         # (method, route, status) -> count
@@ -36,6 +51,11 @@ class Metrics:
         self._duration_sum: dict[tuple[str, str], float] = {}
         self._active_streams = 0
         self._stream_total = 0
+        self._stream_rejected = 0
+        # 流式连接并发上限；None 时从 OPENCLAW_MAX_STREAMS 读取（默认 64），0 表示不限
+        self._max_streams = (
+            max_streams if max_streams is not None else _resolve_max_streams(os.environ.get(_STREAM_LIMIT_ENV))
+        )
 
     def record_request(self, method: str, route: str, status: int, elapsed: float) -> None:
         """记录一次 HTTP 请求的结果与耗时。"""
@@ -52,10 +72,23 @@ class Metrics:
                     self._durations[(method, route, le)] = self._durations.get((method, route, le), 0) + 1
 
     def enter_stream(self) -> None:
-        """流式连接建立时调用。"""
+        """流式连接建立时调用（无条件占用）。"""
         with self._lock:
             self._active_streams += 1
             self._stream_total += 1
+
+    def try_enter_stream(self) -> bool:
+        """尝试占用一个流式连接槽位。
+
+        未超限返回 True 并占用；已满返回 False 并累计拒绝计数（不改变占用数）。
+        """
+        with self._lock:
+            if self._max_streams > 0 and self._active_streams >= self._max_streams:
+                self._stream_rejected += 1
+                return False
+            self._active_streams += 1
+            self._stream_total += 1
+            return True
 
     def exit_stream(self) -> None:
         """流式连接结束时调用。"""
@@ -110,6 +143,9 @@ class Metrics:
                 "# HELP openclaw_streams_total Total streams ever established.",
                 "# TYPE openclaw_streams_total counter",
                 f"openclaw_streams_total {self._stream_total}",
+                "# HELP openclaw_streams_rejected_total Streams rejected because the concurrency limit was reached.",
+                "# TYPE openclaw_streams_rejected_total counter",
+                f"openclaw_streams_rejected_total {self._stream_rejected}",
             ]
         return "\n".join(lines) + "\n"
 
@@ -164,14 +200,43 @@ class MetricsMiddleware:
 
 
 class StreamCounter:
-    """上下文管理器：统计 SSE / WebSocket 活跃连接数。"""
+    """流式连接槽位：占用/释放活跃 SSE / WebSocket 槽位，超限时拒绝。
+
+    用法（推荐显式 try_enter，便于返回 503 / WS 1013）:
+        counter = StreamCounter()
+        if not counter.try_enter():
+            raise HTTPException(status_code=503, detail="Too many concurrent streams")
+        ...
+        counter.release()   # 或 with 块自动释放
+
+    也可作为上下文管理器（自动 try_enter + __exit__ 释放）:
+        with StreamCounter(metrics=m) as c:
+            if c.accepted: ...
+    """
 
     def __init__(self, metrics: Metrics | None = None) -> None:
         self._metrics = metrics or _metrics
+        self._entered = False
+
+    def try_enter(self) -> bool:
+        """尝试占用一个槽位；超限返回 False（不占用、累计拒绝计数）。"""
+        self._entered = self._metrics.try_enter_stream()
+        return self._entered
+
+    @property
+    def accepted(self) -> bool:
+        """是否已成功占用槽位。"""
+        return self._entered
+
+    def release(self) -> None:
+        """释放槽位（幂等，可重复调用）。"""
+        if self._entered:
+            self._metrics.exit_stream()
+            self._entered = False
 
     def __enter__(self) -> StreamCounter:
-        self._metrics.enter_stream()
+        self.try_enter()
         return self
 
     def __exit__(self, *exc: Any) -> None:
-        self._metrics.exit_stream()
+        self.release()

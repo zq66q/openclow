@@ -74,6 +74,66 @@ class TestMetricsCollector:
             assert m._active_streams == 1
         assert m._active_streams == 0
 
+    def test_max_streams_limits(self):
+        """并发上限：超限拒绝且不计入活跃数。"""
+        from api.metrics import Metrics
+
+        m = Metrics(max_streams=2)
+        assert m.try_enter_stream() is True
+        assert m.try_enter_stream() is True
+        assert m.try_enter_stream() is False  # 已满
+        assert m._active_streams == 2
+        assert m._stream_rejected == 1
+        m.exit_stream()
+        assert m.try_enter_stream() is True  # 释放后可再进
+
+    def test_unlimited_streams_when_zero(self):
+        """max_streams=0 表示不限制。"""
+        from api.metrics import Metrics
+
+        m = Metrics(max_streams=0)
+        for _ in range(10):
+            assert m.try_enter_stream() is True
+        assert m._active_streams == 10
+        assert m._stream_rejected == 0
+
+    def test_stream_counter_reject_and_release(self):
+        """StreamCounter 超限拒绝，release 幂等。"""
+        from api.metrics import Metrics, StreamCounter
+
+        m = Metrics(max_streams=1)
+        c1 = StreamCounter(metrics=m)
+        assert c1.try_enter() is True
+        assert c1.accepted is True
+        c2 = StreamCounter(metrics=m)
+        assert c2.try_enter() is False
+        assert c2.accepted is False
+        c2.release()  # 未占用，无副作用
+        c1.release()
+        c1.release()  # 幂等
+        assert m._active_streams == 0
+
+    def test_rejected_metric_rendered(self):
+        """拒绝计数渲染为 Prometheus 指标。"""
+        from api.metrics import Metrics
+
+        m = Metrics(max_streams=1)
+        m.try_enter_stream()
+        m.try_enter_stream()  # 被拒
+        text = m.render()
+        assert "openclaw_streams_rejected_total 1" in text
+
+    def test_env_max_streams(self, monkeypatch):
+        """OPENCLAW_MAX_STREAMS 环境变量控制上限。"""
+        from api.metrics import Metrics
+
+        monkeypatch.setenv("OPENCLAW_MAX_STREAMS", "3")
+        assert Metrics()._max_streams == 3
+        monkeypatch.setenv("OPENCLAW_MAX_STREAMS", "invalid")
+        assert Metrics()._max_streams == 64  # 非法回退默认
+        monkeypatch.setenv("OPENCLAW_MAX_STREAMS", "0")
+        assert Metrics()._max_streams == 0  # 0 表示不限
+
     def test_metrics_switch_respects_env(self):
         """OPENCLAW_METRICS_ENABLED=false 时不采集。"""
         from api.metrics import Metrics
@@ -146,3 +206,82 @@ class TestMetricsEndpoint:
             else:
                 _os.environ["OPENCLAW_AUTH_MODE"] = old
             _os.environ.pop("OPENCLAW_API_KEYS", None)
+
+
+class TestStreamLimit:
+    """/chat/stream 与 /chat/ws 并发上限（OPENCLAW_MAX_STREAMS=1）。"""
+
+    @pytest.fixture
+    def client(self, tmp_facade, monkeypatch):
+        """创建 TestClient，并把全局指标单例的上限设为 1。"""
+        import api.metrics as M
+
+        monkeypatch.setenv("OPENCLAW_MAX_STREAMS", "1")
+        M._metrics = M.Metrics()  # 重建单例，读新 env
+
+        try:
+            from api.server import create_app
+
+            app = create_app(facade=tmp_facade)
+            if not _is_fastapi_available():
+                pytest.skip("FastAPI not installed")
+            try:
+                from fastapi.testclient import TestClient
+
+                yield TestClient(app)
+            except ImportError:
+                pytest.skip("TestClient not available (install httpx)")
+        finally:
+            M._metrics = M.Metrics()  # 还原为默认上限，避免污染其他测试
+
+    def test_stream_503_when_at_limit(self, client):
+        """并发已满时 /chat/stream 返回 503，并计入拒绝指标。"""
+        import api.metrics as M
+
+        M._metrics.enter_stream()  # 占用唯一槽位
+        try:
+            r = client.post("/chat/stream", json={"query": "x"})
+            assert r.status_code == 503
+            body = client.get("/metrics").text
+            assert 'status="503"' in body
+            assert "openclaw_streams_rejected_total 1" in body
+        finally:
+            M._metrics.exit_stream()
+
+    def test_stream_ok_when_slot_free(self, client, monkeypatch):
+        """槽位空闲时 /chat/stream 正常返回 SSE。"""
+        from types import SimpleNamespace
+
+        def _stub_stream(query, **kwargs):
+            yield {"type": "_done", "answer": "ok", "elapsed_ms": 1, "steps": []}
+
+        stub = SimpleNamespace(master_agent_chat_stream=_stub_stream)
+        monkeypatch.setattr("api.routes.chat._get_svc", lambda: stub)
+
+        r = client.post("/chat/stream", json={"query": "hello"})
+        assert r.status_code == 200
+        assert "event-stream" in r.headers.get("content-type", "")
+        assert '"type": "done"' in r.text
+        assert '"answer": "ok"' in r.text
+
+    def test_ws_rejected_when_at_limit(self, client):
+        """并发已满时 /chat/ws 先收到 error 再以 code 1013 关闭。"""
+        import api.metrics as M
+
+        M._metrics.enter_stream()
+        try:
+            from starlette.websockets import WebSocketDisconnect
+
+            with pytest.raises(WebSocketDisconnect) as exc_info, client.websocket_connect("/chat/ws") as ws:
+                first = ws.receive_json()  # 服务端先发 error 消息
+                assert first["type"] == "error"
+                ws.receive_json()  # 随后是 close 帧 → 抛 WebSocketDisconnect
+            assert exc_info.value.code == 1013
+        finally:
+            M._metrics.exit_stream()
+
+    def test_ws_ok_when_slot_free(self, client):
+        """槽位空闲时 /chat/ws 可连接并收到 connected。"""
+        with client.websocket_connect("/chat/ws") as ws:
+            data = ws.receive_json()
+            assert data["type"] == "connected"

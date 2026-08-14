@@ -162,6 +162,7 @@ docker compose -f docker-compose.prod.yml --profile full up -d --build
 | `AUDIT_LOG_LEVEL` | `INFO` | 审计日志级别 |
 | `OPENCLAW_LOG_FORMAT` | `text` | 控制台日志格式：`text`（彩色） / `json`（结构化，容器内采集推荐） |
 | `OPENCLAW_METRICS_ENABLED` | `true` | Prometheus `/metrics` 开关，`false` 关闭 |
+| `OPENCLAW_MAX_STREAMS` | `64` | SSE `/chat/stream` 与 WebSocket `/chat/ws` 并发连接上限，`0` 表示不限；超限返回 `503` / `1013` |
 
 ---
 
@@ -372,7 +373,8 @@ curl -sf https://api.你的域名/health
 | 链路追踪 | 已接入 LangSmith（`LANGCHAIN_TRACING_V2=true` + API Key） |
 | 审计日志 | 本地 jsonl，可采集；`OPENCLAW_LOG_FORMAT=json` 可让 stdout 也输出 JSON |
 | 进程/容器监控 | Docker `stats` / `docker ps` 人工查看 |
-| 指标 | 已内置 `/metrics`（Prometheus 文本格式）：HTTP 请求数/耗时直方图、活跃流式连接数、运行时长；免认证白名单 |
+| 指标 | 已内置 `/metrics`（Prometheus 文本格式）：HTTP 请求数/耗时直方图、活跃/累计/被拒的流式连接数、运行时长；免认证白名单 |
+| 流式连接保护 | SSE/WS 并发上限 `OPENCLAW_MAX_STREAMS`（默认 64），超限 `/chat/stream` 返回 `503`、`/chat/ws` 关闭 `1013` |
 
 ```bash
 # 查看内置指标
