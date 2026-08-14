@@ -76,12 +76,15 @@ CI 里启动容器只设置了 `OPENAI_API_KEY=mock` 和 `OPENCLAW_AUTH_MODE=non
 - 上传文件大小 / 类型二次校验（虽然配置里有，但代码层是否严格检查需确认）
 - 认证失败锁定 / 延迟
 
-### P1 没有备份与恢复方案
+### P1 ~~没有备份与恢复方案~~ ✅ 已完成
 
-生产数据在 `data/` 里（SQLite + Chroma 向量库 + 上传文件 + 审计日志）。没有任何：
-- 自动备份脚本
-- 数据卷快照策略
-- 灾难恢复文档
+生产数据在 `data/` 里（SQLite + Chroma 向量库 + 上传文件 + 审计日志）。
+
+已实现：
+- `scripts/backup.py`：SQLite 在线安全备份（`Connection.backup`，服务运行时可用）+ 非 SQLite 文件复制 + tar.gz 打包 + 自动清理过期备份（`--keep`）
+- `scripts/backup.sh`：Linux cron 入口（自动探测 venv）
+- `BACKUP.md`：备份范围、手动/cron/异地同步命令、恢复流程与演练建议
+- 剩余可做：数据卷快照策略、备份上传到对象存储（S3/OSS）自动化
 
 ### P1 没有数据库迁移机制
 
@@ -145,7 +148,7 @@ Dockerfile 有 `STOPSIGNAL SIGTERM`，但没有 `uvicorn` 的 `--graceful-timeou
 | P1 | Dockerfile 改用 `pyproject.toml` 安装依赖 | 避免依赖漂移 |
 | P1 | 修复 CI Docker 健康检查参数 | CI 稳定 |
 | P1 | 增加 Rate Limiting 中间件 | 防攻击 |
-| P1 | 增加数据备份脚本 / 文档 | 数据安全 |
+| ~~P1~~ | ✅ ~~增加数据备份脚本 / 文档~~ | 数据安全 |
 | P1 | 增加 SQLite 迁移机制（Alembic） | 可升级 |
 | P2 | 删除/合并 `config/.env.example` | 减少误导 |
 | P2 | 填写 `pyproject.toml` 作者信息 | 元数据完整 |

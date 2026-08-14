@@ -87,6 +87,21 @@ docker compose -f docker-compose.prod.yml --profile full up -d # 含 Web UI
 #    UI:  https://app.your-domain.com
 ```
 
+### 5. 数据备份
+
+```bash
+python scripts/backup.py                 # 备份到 ./backups
+python scripts/backup.py --keep 14       # 保留最近 14 份
+```
+
+Linux 定时备份（crontab）：
+
+```cron
+0 3 * * * /opt/openclaw/scripts/backup.sh >> /var/log/openclaw-backup.log 2>&1
+```
+
+备份范围：SQLite（记忆/状态/向量库）在线安全快照 + 审计日志/上传文件。完整策略与恢复流程见 [`BACKUP.md`](BACKUP.md)。
+
 ## 核心功能
 
 ### 多场景对话
