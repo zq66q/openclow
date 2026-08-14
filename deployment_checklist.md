@@ -1,0 +1,159 @@
+# OpenClaw 部署就绪检查报告
+
+检查时间：2026-08-14
+检查范围：Docker / Compose / CI / 配置 / 安全 / 文档 / 运维
+
+## ✅ 已有的、做得不错的地方
+
+| 项目 | 状态 | 说明 |
+|------|------|------|
+| Dockerfile | ✅ | 多阶段构建、非 root 用户、HEALTHCHECK、tini init |
+| docker-compose.yml | ✅ | API + UI、数据卷、资源限制、健康检查 |
+| GitHub Actions CI | ✅ | lint / test / docker build / 可选 push |
+| 测试覆盖 | ✅ | 110 passed, 1 skipped |
+| pre-commit | ✅ | ruff + mypy + conventional commit |
+| Makefile | ✅ | 常用命令封装完整 |
+| .gitignore / .dockerignore | ✅ | 密钥、数据、缓存都排除了 |
+| 健康检查端点 | ✅ | `/health` |
+| API Key / JWT 认证 | ✅ | 已实现，已改为默认 apikey |
+| CORS 收紧 | ✅ | 已改为环境变量驱动，默认本地来源 |
+
+## 🔴 部署前必须补的（P0/P1）
+
+### P0 关键配置错误：README 变量名和代码不一致
+
+README 写的变量名和实际代码读取的不一样，用户按 README 配会直接跑不起来：
+
+| README 写的 | 代码实际读取的 | 位置 |
+|------------|--------------|------|
+| `OPENCLAW_LLM_API_KEY` | `LLM_API_KEY` | `src/core/settings.py` |
+| `OPENCLAW_LLM_BASE_URL` | `LLM_BASE_URL` | `src/core/settings.py` |
+| `OPENCLAW_LLM_MODEL` | `LLM_MODEL` | `src/core/settings.py` |
+| `OPENCLAW_MEMORY_DB` | `MEMORY_DB_PATH` | `src/core/settings.py` |
+| `OPENCLAW_RAG_DIR` | `RAG_VECTOR_STORE_PATH` | `src/core/settings.py` |
+
+`.env.example` 顶部还有 `OPENAI_API_KEY`，代码里实际用的是 `LLM_API_KEY`。
+
+**风险**：第一次部署的人按 README 填完发现服务读不到 key，LLM 调用全失败。
+
+### P0 LICENSE 文件缺失
+
+README 写了 MIT License，但仓库根目录没有 `LICENSE` 文件。GitHub 不会识别为 MIT 仓库，且存在法律风险。
+
+### P1 没有生产级 docker-compose.prod.yml
+
+现有的 `docker-compose.yml` 适合本地开发/单节点，但生产缺：
+- 反向代理（Caddy / Nginx）
+- HTTPS 自动证书
+- 不直接暴露 8000 端口到公网
+- 没有 WebSocket 升级配置
+- 没有请求速率限制 / WAF
+
+### P1 没有 `data/.gitkeep`
+
+`.gitignore` 排除了整个 `data/` 目录，但代码运行时依赖 `data/` 存在。新 clone 的仓库没有 `data/` 目录，首次启动会报错。应加 `data/.gitkeep` 并在 `.gitignore` 中 `!data/.gitkeep`。
+
+（`.gitignore` 里已经写了 `!data/.gitkeep`，但实际文件不存在。）
+
+### P1 Dockerfile 没有从 pyproject.toml 安装依赖
+
+Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
+- 缺少 `unstructured[all-docs]` 等文档解析依赖（除非加 `INSTALL_EXTRAS=true`）
+- 版本号可能和 pyproject 漂移
+- 维护两份依赖清单容易出错
+
+**建议**：`COPY pyproject.toml ./` 后直接用 `pip install -e .` 或 `pip install -e ".[all]"`。
+
+### P1 CI 的 Docker 健康检查会失败
+
+CI 里启动容器只设置了 `OPENAI_API_KEY=mock` 和 `OPENCLAW_AUTH_MODE=none`，但服务启动时可能会尝试初始化 LLM / RAG / Memory，如果 `LLM_API_KEY` 为空或 LangSmith key 无效，启动可能失败或健康检查不过。
+
+### P1 没有请求限流 / 防暴力破解
+
+生产环境直接暴露 API，没有：
+- 全局速率限制（Rate Limiting）
+- 单 IP 限制
+- 上传文件大小 / 类型二次校验（虽然配置里有，但代码层是否严格检查需确认）
+- 认证失败锁定 / 延迟
+
+### P1 没有备份与恢复方案
+
+生产数据在 `data/` 里（SQLite + Chroma 向量库 + 上传文件 + 审计日志）。没有任何：
+- 自动备份脚本
+- 数据卷快照策略
+- 灾难恢复文档
+
+### P1 没有数据库迁移机制
+
+使用 SQLite + aiosqlite，但没有 Alembic 或任何 schema 迁移工具。如果未来 memory/audit 表结构变更，升级会炸。
+
+## 🟡 强烈建议补的（P2）
+
+### P2 `config/.env.example` 冗余
+
+根目录已有 `.env.example`，`config/.env.example` 内容重复且可能过期，容易误导。
+
+### P2 `pyproject.toml` 作者是占位符
+
+```toml
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+```
+
+发布到 PyPI 或 Docker Hub 会很难看。
+
+### P2 缺少生产运维文档
+
+没有：
+- `DEPLOYMENT.md` 或 `docs/deployment.md`
+- 环境变量完整清单和示例
+- 升级/回滚步骤
+- 监控告警方案
+
+### P2 没有集中式日志 / 指标
+
+- 审计日志写到本地文件，生产难以聚合
+- 没有 Prometheus / Grafana 指标
+- 没有结构化日志（JSON）开关
+- 没有错误追踪（Sentry）集成点
+
+### P2 WebSocket / SSE 没有连接数限制
+
+生产直接暴露，长连接可能把服务器拖垮。
+
+### P2 没有 graceful shutdown 超时配置
+
+Dockerfile 有 `STOPSIGNAL SIGTERM`，但没有 `uvicorn` 的 `--graceful-timeout` 配置。
+
+## 🔵 可以后续再做的（P3）
+
+- CHANGELOG.md
+- SECURITY.md（漏洞上报流程）
+- CONTRIBUTING.md
+- 性能基准测试
+- 多语言 README
+
+## 📋 按优先级排序的待办清单
+
+| 优先级 | 任务 | 影响 |
+|--------|------|------|
+| P0 | 统一 README / `.env.example` / `pyproject.toml` 变量名 | 避免部署即翻车 |
+| P0 | 添加 LICENSE 文件 | 合规 |
+| P1 | 创建 `docker-compose.prod.yml` + Caddyfile（HTTPS） | 安全上线 |
+| P1 | 创建 `data/.gitkeep` | 新环境可启动 |
+| P1 | Dockerfile 改用 `pyproject.toml` 安装依赖 | 避免依赖漂移 |
+| P1 | 修复 CI Docker 健康检查参数 | CI 稳定 |
+| P1 | 增加 Rate Limiting 中间件 | 防攻击 |
+| P1 | 增加数据备份脚本 / 文档 | 数据安全 |
+| P1 | 增加 SQLite 迁移机制（Alembic） | 可升级 |
+| P2 | 删除/合并 `config/.env.example` | 减少误导 |
+| P2 | 填写 `pyproject.toml` 作者信息 | 元数据完整 |
+| P2 | 写 `DEPLOYMENT.md` | 降低运维成本 |
+| P2 | 增加 Prometheus/结构化日志集成点 | 可观测性 |
+
+## 总体评估
+
+**当前状态：黄灯偏红。**
+
+代码质量、测试、容器化基础已经具备，但 README 变量名错误、LICENSE 缺失、没有生产 compose 和备份策略，直接部署有较高风险。建议先把 P0 + P1 前 5 项补齐，再考虑真正上线。
