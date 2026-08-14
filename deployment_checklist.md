@@ -64,9 +64,15 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 
 **建议**：`COPY pyproject.toml ./` 后直接用 `pip install -e .` 或 `pip install -e ".[all]"`。
 
-### P1 CI 的 Docker 健康检查会失败
+### ✅ P1 CI 的 Docker 健康检查参数
 
-CI 里启动容器只设置了 `OPENAI_API_KEY=mock` 和 `OPENCLAW_AUTH_MODE=none`，但服务启动时可能会尝试初始化 LLM / RAG / Memory，如果 `LLM_API_KEY` 为空或 LangSmith key 无效，启动可能失败或健康检查不过。
+已在 `.github/workflows/ci.yml` 的 `Test Docker image health` 步骤中：
+- 使用正确变量名：`LLM_API_KEY=mock`、`EMBEDDING_API_KEY=mock`
+- 关闭外部依赖：`OPENCLAW_AUTH_MODE=none`、`OPENCLAW_RATE_LIMIT_ENABLED=false`、`LANGCHAIN_TRACING_V2=false`
+- 将固定 `sleep 5` 改为最多 60 秒轮询 `/health`，输出 JSON 报告后再清理容器
+- 修复了 Docker Hub 推送条件，避免 `schedule` / `workflow_dispatch` 触发时访问不存在的 inputs
+
+`Dockerfile` 与 `docker-compose.prod.yml` 已保留 `HEALTHCHECK` / `healthcheck` 配置。
 
 ### P1 没有请求限流 / 防暴力破解
 

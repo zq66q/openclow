@@ -102,5 +102,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # Tini 作为 init 进程（正确处理信号、僵尸进程回收）
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-# 启动命令
-CMD ["python", "-c", "import sys; sys.path.insert(0,'.'); from cli import main; sys.exit(main(['serve', '--host', '0.0.0.0', '--port', '8000']))"]
+# 启动命令（通过 pyproject.toml 注册的 openclaw 入口）
+CMD ["openclaw", "serve", "--host", "0.0.0.0", "--port", "8000"]
