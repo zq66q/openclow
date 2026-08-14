@@ -87,7 +87,27 @@ docker compose -f docker-compose.prod.yml --profile full up -d # 含 Web UI
 #    UI:  https://app.your-domain.com
 ```
 
-### 5. 数据备份
+### 5. 数据库迁移
+
+项目使用 [Alembic](https://alembic.sqlalchemy.org/) 管理主库 `data/memory.db`（记忆 + 会话表）的 schema 版本，升级应用前先执行迁移：
+
+```bash
+make migrate                                  # 或: alembic upgrade head
+```
+
+生成新迁移脚本（结构变更时使用，手动填写 upgrade/downgrade）：
+
+```bash
+make migration name="add_xxx_column"          # 或: alembic revision -m "add_xxx_column"
+```
+
+说明：
+
+- 迁移目标是 `settings.memory.db_path`（可用环境变量 `MEMORY_DB_PATH` 覆盖）；测试/CI 用 `ALEMBIC_DB_PATH` 指向临时库。
+- 对旧版本部署（已由应用自动建表、尚无 `alembic_version` 表）同样安全——baseline 使用幂等 DDL 平滑接管，不丢数据。
+- 应用启动时的幂等建表逻辑（`CREATE TABLE IF NOT EXISTS`）保留，与 Alembic 管理并存，互不冲突。
+
+### 6. 数据备份
 
 ```bash
 python scripts/backup.py                 # 备份到 ./backups

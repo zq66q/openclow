@@ -92,9 +92,18 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 - `BACKUP.md`：备份范围、手动/cron/异地同步命令、恢复流程与演练建议
 - 剩余可做：数据卷快照策略、备份上传到对象存储（S3/OSS）自动化
 
-### P1 没有数据库迁移机制
+### ✅ P1 没有数据库迁移机制
 
 使用 SQLite + aiosqlite，但没有 Alembic 或任何 schema 迁移工具。如果未来 memory/audit 表结构变更，升级会炸。
+
+已接入 Alembic 管理主库 `memory.db`（`memories` + `business_sessions` + `_schema_version`）：
+- `alembic/` + `alembic.ini`：`env.py` 动态解析库路径（`settings.memory.db_path`，可用 `ALEMBIC_DB_PATH` 覆盖）；baseline 迁移 `be41079bf6fb` 用幂等 DDL 平滑接管旧库，不丢数据
+- 使用：`make migrate`（升级）/ `make migration name="..."`（新脚本）
+- 依赖：`alembic>=1.13.0` + `sqlalchemy>=2.0.0`（已加入 pyproject 主依赖）
+- 测试：`tests/unit/test_migrations.py` 4 项（全新库 / 旧库接管 / downgrade / current）
+- 说明见 README「数据库迁移」节
+
+注：`state.db` / `cost_records.db` / `review_history.db` 为独立小型库，结构稳定，暂由应用幂等建表；未来如需版本管理可在 env.py 扩展多库支持。
 
 ## 🟡 强烈建议补的（P2）
 
@@ -155,7 +164,7 @@ Dockerfile 有 `STOPSIGNAL SIGTERM`，但没有 `uvicorn` 的 `--graceful-timeou
 | P1 | 修复 CI Docker 健康检查参数 | CI 稳定 |
 | P1 | 增加 Rate Limiting 中间件 | 防攻击 |
 | ~~P1~~ | ✅ ~~增加数据备份脚本 / 文档~~ | 数据安全 |
-| P1 | 增加 SQLite 迁移机制（Alembic） | 可升级 |
+| ~~P1~~ | ✅ ~~增加 SQLite 迁移机制（Alembic）~~ | 可升级 |
 | ✅ | ~~删除/合并 `config/.env.example`~~ | 已删除 |
 | P2 | 填写 `pyproject.toml` 作者信息 | 元数据完整 |
 | P2 | 写 `DEPLOYMENT.md` | 降低运维成本 |

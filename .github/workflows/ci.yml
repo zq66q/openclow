@@ -70,10 +70,10 @@ jobs:
           pip install -e ".[dev,rag]"
 
       - name: ruff check
-        run: ruff check src/ tests/ cli.py
+        run: ruff check src/ tests/ cli.py alembic/
 
       - name: ruff format check
-        run: ruff format --check src/ tests/ cli.py
+        run: ruff format --check src/ tests/ cli.py alembic/
 
       - name: mypy type check
         run: mypy src/ cli.py

@@ -37,16 +37,16 @@ install-dev: ## 安装开发依赖（含测试、lint、pre-commit）
 # ── 代码质量 ──
 .PHONY: lint lint-fix format format-check type-check
 lint: ## 运行 ruff 代码检查
-	$(RUFF) check src/ tests/ cli.py
+	$(RUFF) check src/ tests/ cli.py alembic/
 
 lint-fix: ## 自动修复 ruff 可修复的问题
-	$(RUFF) check --fix src/ tests/ cli.py
+	$(RUFF) check --fix src/ tests/ cli.py alembic/
 
 format: ## 自动格式化代码
-	$(RUFF) format src/ tests/ cli.py
+	$(RUFF) format src/ tests/ cli.py alembic/
 
 format-check: ## 检查代码格式（CI 使用）
-	$(RUFF) format --check src/ tests/ cli.py
+	$(RUFF) format --check src/ tests/ cli.py alembic/
 
 type-check: ## 运行 mypy 类型检查
 	$(MYPY) src/ cli.py
@@ -72,6 +72,14 @@ serve-reload: ## 启动 API 服务（开发热重载）
 
 ui: ## 启动 Streamlit Web UI
 	PYTHONPATH=src streamlit run src/ui/app.py
+
+# ── 数据库迁移 ──
+.PHONY: migrate migration
+migrate: ## 应用数据库迁移到最新版本（alembic upgrade head）
+	$(PYTHON) -m alembic upgrade head
+
+migration: ## 生成新的迁移脚本骨架（然后手动填写 upgrade/downgrade）
+	$(PYTHON) -m alembic revision -m "$(name)"
 
 # ── Docker ──
 .PHONY: docker-build docker-up docker-down docker-logs

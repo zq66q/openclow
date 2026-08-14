@@ -54,6 +54,10 @@ dependencies = [
     # 异步与缓存
     "aiosqlite>=0.20.0",
     "cachetools>=5.5.0",
+
+    # 数据库迁移（schema 版本管理，`alembic upgrade head`）
+    "alembic>=1.13.0",
+    "sqlalchemy>=2.0.0",
 ]
 
 [project.scripts]
