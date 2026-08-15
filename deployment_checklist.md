@@ -89,8 +89,9 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 已实现：
 - `scripts/backup.py`：SQLite 在线安全备份（`Connection.backup`，服务运行时可用）+ 非 SQLite 文件复制 + tar.gz 打包 + 自动清理过期备份（`--keep`）
 - `scripts/backup.sh`：Linux cron 入口（自动探测 venv）
-- `BACKUP.md`：备份范围、手动/cron/异地同步命令、恢复流程与演练建议
-- 剩余可做：数据卷快照策略、备份上传到对象存储（S3/OSS）自动化
+- `scripts/upload_backup.py`（2026-08-15 新增）：上传备份到对象存储（S3/OSS/COS，纯标准库 SigV4）+ ETag/sha256 校验 + 远端保留清理 + `--dry-run`/`--verify`
+- `BACKUP.md`：备份范围、手动/cron/对象存储异地同步命令、恢复流程与演练建议
+- 剩余可做：数据卷快照策略（可选）
 
 ### ✅ P1 没有数据库迁移机制
 
@@ -205,6 +206,8 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 | 可观测性 | `docker-compose.prod.yml` 新增 `prometheus` + `grafana` 服务（`monitoring` profile） | `/metrics` 采集 + 可视化开箱即用 |
 | 可观测性 | 新增 `monitoring/prometheus.yml`、`monitoring/grafana/provisioning/` | 抓取配置 + 数据源自动注册 |
 | 文档 | `DEPLOYMENT.md` §11 补充监控栈接入说明 | 含 SSH 隧道访问与安全提示 |
+| 备份容灾 | 新增 `scripts/upload_backup.py`（S3/OSS/COS 通用，纯标准库 SigV4） | 本地备份上传异地对象存储 + ETag/sha256 校验 + 远端保留清理 |
+| 备份容灾 | `BACKUP.md` 新增对象存储章节、`.env.example` 新增 OBS 配置段 | 配置说明 + cron 自动化示例 |
 
 ### CI 最终结果（commit `7a5b6e8`）
 
@@ -218,5 +221,5 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 - 域名 + DNS（`api.` / `app.` 子域名）
 - Linux 服务器（≥4 核 8G，Docker 24+）
 - 轮换本地 `.env` 中已暴露的 6 个 API key（DeepSeek / DashScope / LangSmith / Tavily / OPENCLAW_API_KEYS）
-- 备份异地同步（对象存储上传脚本，可选）
 - 外部探活告警（UptimeRobot / 云监控）
+- 对象存储 Bucket 开通 + 最小权限密钥（脚本已就绪，等待云资源）

@@ -48,6 +48,52 @@ python scripts/backup.py --keep 7        # 只保留最近 7 份
 5 3 * * * rsync -az /opt/openclaw/backups/ user@backup-host:/srv/backups/openclaw/
 ```
 
+### 对象存储异地备份（推荐）
+
+`scripts/upload_backup.py` 把本地 `backups/` 下的 `openclaw-backup-*.tar.gz` 上传到对象存储（**AWS S3 / 阿里云 OSS / 腾讯云 COS 通用**，纯标准库实现 AWS SigV4 签名，无需安装任何 SDK），支持上传后下载校验与远端保留份数清理。
+
+**1. 在 `.env` 中配置（脚本默认读取 `./.env`，也可 `--env-file` 指定）：**
+
+```dotenv
+# 三家任选其一（region 换成你的实际地域）
+OPENCLAW_OBS_ENDPOINT=https://s3.ap-northeast-1.amazonaws.com      # AWS S3
+# OPENCLAW_OBS_ENDPOINT=https://s3.oss-cn-hangzhou.aliyuncs.com   # 阿里云 OSS（仅支持 virtual 风格）
+# OPENCLAW_OBS_ENDPOINT=https://cos.ap-guangzhou.myqcloud.com     # 腾讯云 COS
+OPENCLAW_OBS_REGION=ap-northeast-1       # 与端点地域一致，如 oss-cn-hangzhou / ap-guangzhou
+OPENCLAW_OBS_BUCKET=my-openclaw-backups  # 存储桶（需提前创建，建议私有读写）
+OPENCLAW_OBS_ACCESS_KEY=xxxxxxxx          # AccessKey（OSS/COS 为 SecretId）
+OPENCLAW_OBS_SECRET_KEY=xxxxxxxx          # SecretKey（OSS/COS 为 SecretKey）
+OPENCLAW_OBS_PREFIX=openclaw-backups/     # 远端对象前缀（默认 openclaw-backups/）
+OPENCLAW_OBS_STYLE=virtual                # 寻址风格 virtual（默认）| path
+```
+
+> 安全提示：建议为备份单独创建**只写该 Bucket 的最小权限密钥**，不要把主账号密钥放进 `.env`。
+
+**2. 手动上传：**
+
+```bash
+python scripts/upload_backup.py                          # 上传所有备份
+python scripts/upload_backup.py --file xxx.tar.gz        # 只上传指定文件
+python scripts/upload_backup.py --verify                 # 上传后下载回来校验 sha256
+python scripts/upload_backup.py --dry-run                # 预演，只打印将要执行的操作
+```
+
+**3. cron 自动化（每天备份 + 上传 + 校验 + 远端保留 30 份）：**
+
+```cron
+0 3 * * * /opt/openclaw/scripts/backup.sh >> /var/log/openclaw-backup.log 2>&1
+10 3 * * * /opt/openclaw/scripts/upload_backup.py --env-file /opt/openclaw/.env \
+    --keep-remote 30 --verify >> /var/log/openclaw-backup.log 2>&1
+```
+
+**4. 从对象存储恢复（下载到本地备份目录后走下方恢复流程）：**
+
+```bash
+# 先用浏览器/控制台或 aws cli 下载，例如：
+aws s3 cp s3://my-openclaw-backups/openclaw-backups/openclaw-backup-20260814-030000.tar.gz \
+    /opt/openclaw/backups/
+```
+
 ## 恢复流程
 
 1. 停止服务：
@@ -81,5 +127,5 @@ python scripts/backup.py --keep 7        # 只保留最近 7 份
 |------|------|
 | 频率 | 每天 1 次（数据量大或业务关键可每小时） |
 | 保留 | 14 份（约两周，可通过 `--keep` 调整） |
-| 异地 | 至少同步一份到其他机器/对象存储 |
+| 异地 | 至少同步一份到其他机器/对象存储（`scripts/upload_backup.py`，远端保留 `--keep-remote`，默认 30 份） |
 | 验证 | 每月手动恢复演练一次 |
