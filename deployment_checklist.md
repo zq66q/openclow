@@ -189,3 +189,34 @@ Dockerfile 里把依赖硬编码写了一遍，和 `pyproject.toml` 不一致：
 **当前状态：黄灯偏红。**
 
 代码质量、测试、容器化基础已经具备，但 README 变量名错误、LICENSE 缺失、没有生产 compose 和备份策略，直接部署有较高风险。建议先把 P0 + P1 前 5 项补齐，再考虑真正上线。
+
+---
+
+## 📌 2026-08-15 状态更新（CI 全绿 + 可观测性补齐）
+
+### 本次更新内容
+
+| 类别 | 变更 | 说明 |
+|------|------|------|
+| CI 修复 | `pyproject.toml` 加 `mypy_path` / `explicit_package_bases` | 修复 mypy 内部导入被解析为 `Any` 的根因 |
+| CI 修复 | `document_parser.py` 循环变量改名 | 修复 pdfplumber `Page` 与 PyPDF2 `PageObject` 类型冲突 |
+| CI 修复 | `docker buildx build --load` | 修复 `--cache-to type=local` 不兼容传统 builder |
+| CI 修复 | Docker Hub 推送改为 `workflow_dispatch` 手动触发 | 未配置 secrets 时 push 不再导致 CI 失败 |
+| 可观测性 | `docker-compose.prod.yml` 新增 `prometheus` + `grafana` 服务（`monitoring` profile） | `/metrics` 采集 + 可视化开箱即用 |
+| 可观测性 | 新增 `monitoring/prometheus.yml`、`monitoring/grafana/provisioning/` | 抓取配置 + 数据源自动注册 |
+| 文档 | `DEPLOYMENT.md` §11 补充监控栈接入说明 | 含 SSH 隧道访问与安全提示 |
+
+### CI 最终结果（commit `7a5b6e8`）
+
+- ✅ Lint & Format Check（mypy + ruff）
+- ✅ Test Suite（Python 3.10 / 3.11 / 3.12）
+- ✅ Docker Build（镜像构建 + 容器健康检查）
+- 本地验证：`mypy` 0 错误，`ruff check/format` 通过，pytest 143 passed / 1 skipped
+
+### 剩余部署缺口（仓库外资源）
+
+- 域名 + DNS（`api.` / `app.` 子域名）
+- Linux 服务器（≥4 核 8G，Docker 24+）
+- 轮换本地 `.env` 中已暴露的 6 个 API key（DeepSeek / DashScope / LangSmith / Tavily / OPENCLAW_API_KEYS）
+- 备份异地同步（对象存储上传脚本，可选）
+- 外部探活告警（UptimeRobot / 云监控）

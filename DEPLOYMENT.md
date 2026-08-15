@@ -384,9 +384,29 @@ curl -s http://localhost:8000/metrics | head -30
 docker stats --no-stream
 ```
 
+### 一键接入 Prometheus + Grafana（已随仓库提供）
+
+`docker-compose.prod.yml` 已内置 `prometheus` 与 `grafana` 服务（`monitoring` profile），开箱即用：
+
+```bash
+# 启动监控栈（默认 profile 不会带起，需显式指定）
+docker compose -f docker-compose.prod.yml --profile monitoring up -d
+
+# Grafana 默认绑定宿主机 localhost:3000，本机访问：
+#   http://localhost:3000   （默认账号 admin/admin，见下方安全提示）
+# 远程服务器建议走 SSH 隧道，勿把 3000 端口暴露公网：
+ssh -L 3000:localhost:3000 user@server
+```
+
+- 数据源已自动注册（`monitoring/grafana/provisioning/`），打开 Grafana 即可直接建面板
+- Prometheus 抓取 `api:8000/metrics`，指标保留 30 天（`monitoring/prometheus.yml`）
+- 默认登录账号 `admin` / `admin`，**生产必须修改**：在 `.env` 设置 `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`，或在首次登录后修改密码
+
+> 若不想用自建 Grafana，也可只保留 Prometheus 抓取，把 `/metrics` 接入云监控（腾讯云 Prometheus / 阿里云 ARMS）托管服务。
+
 建议生产接入：
 - 外部探活（UptimeRobot / 云监控 HTTP 探针）盯 `/health`，异常告警
-- Prometheus + Grafana 抓取 `/metrics`（docker-compose 加 `prom/prometheus` + `grafana/grafana` 服务即可）
+- 告警规则（CPU/内存/流式连接超限）建议用 Prometheus Alertmanager + 邮件/企业微信通知，属后续增强项
 
 ---
 
