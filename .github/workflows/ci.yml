@@ -140,7 +140,8 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build \
+          docker buildx build \
+            --load \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             -t ${{ env.IMAGE_NAME }}:${{ github.sha }} \
