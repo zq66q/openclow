@@ -9,7 +9,8 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from agent.base import AgentResult, AgentState
 from core.logger import logger
@@ -28,7 +29,10 @@ class AgentExecutor:
 
     @staticmethod
     def run(
-        agent: BaseAgent, query: str, step_callback: callable | None = None, image_data: str | None = None
+        agent: BaseAgent,
+        query: str,
+        step_callback: Callable[[dict[str, Any]], None] | None = None,
+        image_data: str | None = None,
     ) -> AgentResult:
         """执行一次 Agent 推理。"""
         logger.info(

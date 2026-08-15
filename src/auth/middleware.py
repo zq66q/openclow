@@ -51,7 +51,7 @@ except ImportError:
     HTTPException = Exception  # type: ignore[misc,assignment]
     Request = object  # type: ignore[misc,assignment]
 
-    def Security(x, **_):  # type: ignore[no-redef]
+    def Security(x: Any, **_: Any) -> Any:  # type: ignore[misc,no-redef]
         return x
 
     APIKeyHeader = object  # type: ignore[misc,assignment]
@@ -160,7 +160,8 @@ class APIKeyAuth:
             return None
         # FastAPI Request
         if hasattr(request, "headers"):
-            return request.headers.get(_API_KEY_HEADER) or request.headers.get("x-api-key")
+            key = request.headers.get(_API_KEY_HEADER) or request.headers.get("x-api-key")
+            return str(key) if key is not None else None
         # 字典风格
         if isinstance(request, dict):
             return request.get(_API_KEY_HEADER) or request.get("x-api-key")
@@ -260,14 +261,14 @@ class JWTAuth:
         """验证并返回 sub（用户标识）。"""
         token = raw_token or self._extract_token(request)
         claims = self.decode(token)
-        return claims.get("sub", "unknown")
+        return str(claims.get("sub", "unknown"))
 
     @staticmethod
     def _extract_token(request: Any) -> str | None:
         """从请求头提取 Bearer Token。"""
         if request is None:
             return None
-        auth = None
+        auth: str | None = None
         if hasattr(request, "headers"):
             auth = request.headers.get("Authorization") or request.headers.get("authorization")
         elif isinstance(request, dict):

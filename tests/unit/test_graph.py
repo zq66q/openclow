@@ -135,6 +135,7 @@ class TestGraphIntegration:
         llm = tmp_facade.llm_client
         graph = build_graph(llm_client=llm, max_steps=2)
 
-        result = graph.invoke({"query": "Hello"})
+        # LangGraph 1.2+ 的 checkpointer 需要 configurable 里带 thread_id
+        result = graph.invoke({"query": "Hello"}, config={"configurable": {"thread_id": "test_graph"}})
         assert result is not None
         assert isinstance(result, dict)

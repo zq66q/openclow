@@ -15,7 +15,11 @@ from core.logger import logger
 # 尽量兼容 LangGraph 存在 / 不存在的环境
 _HAS_LANGGRAPH = False
 try:
-    from langgraph.checkpoint import BaseCheckpointSaver
+    # 兼容新旧 langgraph 版本：checkpoint 模块结构有调整
+    try:
+        from langgraph.checkpoint.base import BaseCheckpointSaver
+    except ImportError:
+        from langgraph.checkpoint import BaseCheckpointSaver  # type: ignore[attr-defined,no-redef]
     from langgraph.graph import END, StateGraph
     from langgraph.graph.message import add_messages
 
@@ -97,7 +101,7 @@ def build_graph(
 
     # ── 节点 ──
 
-    def agent_node(state: dict[str, Any]) -> dict[str, Any]:
+    def agent_node(state: OpenClawState) -> dict[str, Any]:
         """Agent 推理节点 — 调用 LLM，可能产生工具调用。"""
         messages = state.get("messages", [])
         query = state.get("query", "")
@@ -131,7 +135,7 @@ def build_graph(
             "step_count": step + 1,
         }
 
-    def tool_node(state: dict[str, Any]) -> dict[str, Any]:
+    def tool_node(state: OpenClawState) -> dict[str, Any]:
         """工具执行节点。"""
         messages = state.get("messages", [])
         step = state.get("step_count", 0)

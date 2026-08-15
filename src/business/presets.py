@@ -459,7 +459,7 @@ class PresetAgents:
         if agent_type == "tool_calling" and custom_tools is not None:
             kwargs["tools"] = custom_tools
 
-        agent = method(**kwargs)
+        agent: BaseAgent = method(**kwargs)
 
         if custom_prompt:
             agent.system_prompt = custom_prompt

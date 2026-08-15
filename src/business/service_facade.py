@@ -33,12 +33,24 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from core.logger import logger
+
+if TYPE_CHECKING:
+    from agent.cost_tracker import CostTracker
+    from agent.observability import AgentObservability
+    from agent.state_store import StateStore
+    from business.session import SessionManager
+    from core.embedding_client import EmbeddingClient
+    from core.llm_client import OpenAIClient
+    from memory.db import MemoryDB
+    from memory.memory_manager import MemoryManager
+    from rag.pipeline import RAGPipeline
 
 # ── 数据类型 ──
 
@@ -154,12 +166,12 @@ class ServiceConfig:
             "RAG_VECTOR_STORE_PATH": "rag_persist_dir",
             "STATE_DB_PATH": "state_db_path",
         }
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         for env_key, field_name in {**fallback_mapping, **mapping}.items():
             if env_key in os.environ:
-                val = os.environ[env_key]
+                val: Any = os.environ[env_key]
                 if field_name in ("budget_usd",):
-                    val = float(val)  # type: ignore[assignment]
+                    val = float(val)
                 kwargs[field_name] = val
         return cls(**kwargs)
 
@@ -229,6 +241,17 @@ class ServiceFacade:
         self.status = ServiceStatus.STOPPED
         self._started_at: float = 0
         self._components: dict[str, Any] = {}
+        # 基础设施组件（start() 中初始化，失败时保持 None / 占位符）
+        self._llm_client: OpenAIClient | _PlaceholderLLM | None = None
+        self._vision_client: OpenAIClient | None = None
+        self._embed_client: EmbeddingClient | None = None
+        self._rag_pipeline: RAGPipeline | None = None
+        self._memory_db: MemoryDB | None = None
+        self._memory_manager: MemoryManager | None = None
+        self._observability: AgentObservability | None = None
+        self._cost_tracker: CostTracker | None = None
+        self._session_manager: SessionManager | None = None
+        self._state_store: StateStore | None = None
 
     # ── 工厂方法 ──
 
@@ -429,7 +452,7 @@ class ServiceFacade:
             pass
 
         try:
-            if self._rag_pipeline:
+            if self._rag_pipeline and hasattr(self._rag_pipeline, "close"):
                 self._rag_pipeline.close()
         except Exception:
             pass
@@ -462,7 +485,7 @@ class ServiceFacade:
             try:
                 rpt = self._cost_tracker.report()
                 report.stats["total_tokens"] = rpt.total_tokens
-                report.stats["total_cost_usd"] = round(rpt.total_cost_usd, 6)
+                report.stats["total_cost_usd"] = round(rpt.estimated_cost_usd, 6)
                 report.stats["total_tool_calls"] = rpt.total_tool_calls
             except Exception:
                 pass
@@ -728,7 +751,9 @@ class ServiceFacade:
             }
 
         app = self.create_scenario(scenario, **kwargs)
-        result = app.chat_with_details(input_result.cleaned_text, session_id=session_id, image_data=image_data)
+        result: dict[str, Any] = app.chat_with_details(
+            input_result.cleaned_text, session_id=session_id, image_data=image_data
+        )
 
         # 输出过滤
         answer = result.get("answer", "")
@@ -940,7 +965,7 @@ class ServiceFacade:
             ],
         }
 
-    def master_agent_chat_stream(self, query: str, **kwargs: Any):
+    def master_agent_chat_stream(self, query: str, **kwargs: Any) -> Generator[dict[str, Any], None, None]:
         """主 Agent 编排模式（流式版本）— 通过 step_callback 逐步推送进度。
 
         这是一个生成器，每步 yield 一个事件 dict:

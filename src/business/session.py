@@ -315,7 +315,7 @@ class SessionManager:
             title=data.get("title", ""),
             messages=data.get("messages", []),
             status=data.get("status", "active"),
-            metadata=data.get("metadata"),
+            metadata=data.get("metadata") or {},
         )
         session.created_at = data.get("created_at", time.time())
         session.updated_at = data.get("updated_at", time.time())

@@ -45,7 +45,7 @@ try:
 except ImportError:
     _HAS_STARLETTE = False
     BaseHTTPMiddleware = object  # type: ignore[misc,assignment]
-    JSONResponse = None  # type: ignore[assignment]
+    JSONResponse = None  # type: ignore[misc,assignment]
 
 # ── 常量 ──
 

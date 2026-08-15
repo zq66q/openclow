@@ -93,7 +93,7 @@ class AppState:
             if kwargs.get("model"):
                 config.llm_model = kwargs["model"]
             if not config.llm_api_key:
-                config.llm_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+                config.llm_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
             facade = ServiceFacade(config)
             facade.start()
             st.session_state[key] = facade
@@ -570,7 +570,7 @@ def run_headless(query: str = "你好") -> str:
     """无 UI 环境的测试入口。"""
     AppState.init()
     facade = AppState.get_facade()
-    return facade.chat(query=query)
+    return str(facade.chat(query=query))
 
 
 if __name__ == "__main__":

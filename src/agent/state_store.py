@@ -29,8 +29,8 @@ class StateStore:
     """
 
     def __init__(self, store_path: str | None = None) -> None:
-        store_path = store_path or getattr(settings, "state_store_path", "./data/states")
-        self._base_path = Path(store_path)
+        resolved_path = store_path or str(getattr(settings, "state_store_path", "./data/states"))
+        self._base_path = Path(resolved_path)
         self._base_path.mkdir(parents=True, exist_ok=True)
         self._use_sqlite = True  # 默认 SQLite
         self._init_sqlite()
@@ -93,13 +93,13 @@ class StateStore:
 
     def save_workflow_step(self, session_id: str, step: Any) -> None:
         """保存单个工作流步骤状态。"""
+        status = getattr(step, "status", "pending")
+        status_value = getattr(status, "value", None)
         data = {
             "session_id": session_id,
             "step_id": getattr(step, "step_id", ""),
             "agent_name": getattr(step, "agent_name", ""),
-            "status": getattr(step, "status", "pending").value
-            if hasattr(getattr(step, "status", "pending"), "value")
-            else str(getattr(step, "status", "pending")),
+            "status": status_value if status_value is not None else str(status),
             "result": getattr(step, "result", {}),
             "started_at": getattr(step, "started_at", 0),
             "finished_at": getattr(step, "finished_at", 0),
@@ -221,7 +221,8 @@ class StateStore:
         if not path.exists():
             return None
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            parsed: dict = json.loads(path.read_text(encoding="utf-8"))
+            return parsed
         except Exception as exc:
             logger.warning(f"StateStore: failed to read {filename}: {exc}")
             return None
@@ -235,7 +236,8 @@ class StateStore:
 def _serialize_context(ctx: Any) -> dict[str, Any]:
     """将 AgentContext 或兼容对象序列化为 dict。"""
     if hasattr(ctx, "snapshot"):
-        return ctx.snapshot()
+        snapshot: dict[str, Any] = ctx.snapshot()
+        return snapshot
 
     return {
         "session_id": getattr(ctx, "session_id", _generate_id()),

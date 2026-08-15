@@ -409,7 +409,7 @@ class PromptLibrary:
             PromptTemplate 或 None
         """
         # 先查内置
-        catalog = getattr(cls, category.upper(), None)
+        catalog: dict[str, PromptTemplate] | None = getattr(cls, category.upper(), None)
         if catalog and name in catalog:
             return catalog[name]
         # 再查自定义

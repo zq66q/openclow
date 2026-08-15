@@ -102,6 +102,7 @@ class RAGPipeline:
                 self.retriever.invalidate_bm25_index()
 
         # 选择分块器
+        chunker: TextChunker | MarkdownChunker | CodeChunker
         if chunker_type == "markdown":
             chunker = MarkdownChunker()
         elif chunker_type == "code":

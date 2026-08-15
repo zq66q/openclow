@@ -3,6 +3,7 @@
 import sys
 from contextvars import ContextVar
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -28,7 +29,7 @@ def set_trace_id(trace_id: str | None = None) -> str:
 class _TraceIdFilter:
     """loguru 过滤器：自动注入 trace_id 到每条日志."""
 
-    def __call__(self, record: dict) -> bool:
+    def __call__(self, record: Any) -> bool:
         record["extra"]["trace_id"] = get_trace_id()
         return True
 

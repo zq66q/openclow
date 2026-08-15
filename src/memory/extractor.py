@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import TYPE_CHECKING
@@ -79,7 +80,8 @@ class MemoryExtractor:
         """
         try:
             prompt = _EXTRACT_PROMPT.format(dialog=dialog_text[-4000:])
-            response, _ = await self._llm.chat_async(
+            response, _ = await asyncio.to_thread(
+                self._llm.chat,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
                 max_tokens=500,

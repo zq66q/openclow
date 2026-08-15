@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 from core.logger import logger
 
 if TYPE_CHECKING:
+    from core.llm_client import BaseLLMClient
     from memory.memory_manager import MemoryManager
     from rag.pipeline import RAGPipeline
 
@@ -121,7 +122,7 @@ class BaseAgent:
 
     def __init__(
         self,
-        llm_client: Any = None,
+        llm_client: BaseLLMClient | None = None,
         memory_manager: MemoryManager | None = None,
         rag_pipeline: RAGPipeline | None = None,
     ) -> None:
@@ -165,7 +166,7 @@ class BaseAgent:
     # ------------------------------------------------------------------
 
     @property
-    def llm_client(self):
+    def llm_client(self) -> BaseLLMClient:
         if self._llm_client is None:
             from core.llm_client import get_llm_client
 
@@ -197,7 +198,7 @@ class BaseAgent:
         query: str,
         *,
         cancel_token: CancellationToken | None = None,
-        step_callback: callable | None = None,
+        step_callback: Callable[[dict[str, Any]], None] | None = None,
         image_data: str | None = None,
     ) -> AgentResult:
         """同步执行入口。"""

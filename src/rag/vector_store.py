@@ -13,7 +13,7 @@ from __future__ import annotations
 import shutil
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from core.logger import get_trace_id, logger
 from core.settings import settings
@@ -80,9 +80,10 @@ class VectorStore:
         self._ensure_collection()
         self._collection.add(
             ids=ids,
-            embeddings=vectors,
+            # chromadb 类型别名基于不可变 Sequence/Mapping（invariance），cast 消除 mypy 不变性报错
+            embeddings=cast(Any, vectors),
             documents=texts,
-            metadatas=metadatas,
+            metadatas=cast(Any, metadatas),
         )
 
         logger.info(
@@ -112,7 +113,7 @@ class VectorStore:
 
         self._ensure_collection()
         results = self._collection.query(
-            query_embeddings=[query_vector],
+            query_embeddings=cast(Any, [query_vector]),
             n_results=top_k,
             where=where,
             include=["documents", "metadatas", "distances"],
@@ -227,7 +228,7 @@ class VectorStore:
         before = self.count()
         # ChromaDB where 条件使用 $eq 操作符确保兼容性
         op_where = {k: {"$eq": v} for k, v in where.items()}
-        self._collection.delete(where=op_where)
+        self._collection.delete(where=cast(Any, op_where))
         after = self.count()
         deleted = before - after
         logger.info(

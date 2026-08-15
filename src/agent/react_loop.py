@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from agent.base import AgentResult, AgentState, AgentStep
@@ -44,7 +45,7 @@ class ReActLoop:
         agent: BaseAgent,
         query: str,
         messages: list[dict[str, Any]] | None = None,
-        step_callback: callable | None = None,
+        step_callback: Callable[[dict[str, Any]], None] | None = None,
         image_data: str | None = None,
     ) -> AgentResult:
         start_time = time.perf_counter()

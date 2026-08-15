@@ -162,7 +162,7 @@ class ResultFusion:
         )
 
     @staticmethod
-    def _vote(valid: dict[str, AgentResult], conflicts: list[str] = None) -> FusionResult:
+    def _vote(valid: dict[str, AgentResult], conflicts: list[str] | None = None) -> FusionResult:
         if len(valid) == 1:
             name, result = next(iter(valid.items()))
             return FusionResult(answer=result.answer, sources=[name], strategy=FusionStrategy.VOTE, confidence=1.0)
@@ -180,7 +180,7 @@ class ResultFusion:
 
     @staticmethod
     def _llm_synthesize(
-        valid: dict[str, AgentResult], llm_client: Any = None, conflicts: list[str] = None
+        valid: dict[str, AgentResult], llm_client: Any = None, conflicts: list[str] | None = None
     ) -> FusionResult:
         if llm_client is None:
             logger.warning("LLM_SYNTHESIZE 降级: 无 llm_client，回退到 CONCAT")

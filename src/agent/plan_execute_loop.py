@@ -12,9 +12,10 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from agent.base import AgentResult, AgentState
+from agent.base import AgentResult, AgentState, AgentStep
 from core.logger import logger
 
 if TYPE_CHECKING:
@@ -34,7 +35,7 @@ class PlanExecuteLoop:
         agent: BaseAgent,
         query: str,
         messages: list[dict[str, Any]] | None = None,
-        step_callback: callable | None = None,
+        step_callback: Callable[[dict[str, Any]], None] | None = None,
         image_data: str | None = None,
     ) -> AgentResult:
         """执行 Plan-and-Execute 循环。
@@ -50,7 +51,7 @@ class PlanExecuteLoop:
         agent.state = AgentState.RUNNING
         total_tokens = {"prompt": 0, "completion": 0, "total": 0}
         all_tool_calls = 0
-        all_steps: list[dict[str, Any]] = []
+        all_steps: list[AgentStep] = []
 
         try:
             # ── Phase 1: Plan ──
@@ -223,7 +224,7 @@ class PlanExecuteLoop:
         """从 LLM 输出中提取 JSON 计划数组。"""
         # 尝试直接解析
         try:
-            parsed = json.loads(raw.strip())
+            parsed: Any = json.loads(raw.strip())
             if isinstance(parsed, list):
                 return parsed
         except json.JSONDecodeError:
@@ -233,7 +234,9 @@ class PlanExecuteLoop:
         m = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", raw, re.DOTALL)
         if m:
             try:
-                return json.loads(m.group(1))
+                parsed = json.loads(m.group(1))
+                if isinstance(parsed, list):
+                    return parsed
             except json.JSONDecodeError:
                 pass
 
@@ -241,7 +244,9 @@ class PlanExecuteLoop:
         m = re.search(r"\[.*?\]", raw, re.DOTALL)
         if m:
             try:
-                return json.loads(m.group(0))
+                parsed = json.loads(m.group(0))
+                if isinstance(parsed, list):
+                    return parsed
             except json.JSONDecodeError:
                 pass
 
@@ -257,7 +262,7 @@ class PlanExecuteLoop:
         step_item: dict[str, Any],
         total_tokens: dict[str, int],
         total_tool_calls: int,
-        step_callback: callable | None,
+        step_callback: Callable[[dict[str, Any]], None] | None,
     ) -> dict[str, Any]:
         """执行单个计划步骤。"""
         step_num = step_item.get("step", 0)
@@ -329,7 +334,8 @@ class PlanExecuteLoop:
         if isinstance(tool_input, str):
             # 尝试解析为 JSON
             try:
-                return json.loads(tool_input)
+                parsed_args: dict[str, Any] = json.loads(tool_input)
+                return parsed_args
             except (json.JSONDecodeError, TypeError):
                 return {"query": tool_input}
         return {"query": str(tool_input)}
@@ -396,21 +402,24 @@ class PlanExecuteLoop:
     def _parse_review(raw: str) -> dict[str, Any]:
         """解析 Review 的 JSON 输出。"""
         try:
-            return json.loads(raw.strip())
+            review: dict[str, Any] = json.loads(raw.strip())
+            return review
         except json.JSONDecodeError:
             pass
 
         m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
         if m:
             try:
-                return json.loads(m.group(1))
+                review = json.loads(m.group(1))
+                return review
             except json.JSONDecodeError:
                 pass
 
         m = re.search(r"\{.*?\}", raw, re.DOTALL)
         if m:
             try:
-                return json.loads(m.group(0))
+                review = json.loads(m.group(0))
+                return review
             except json.JSONDecodeError:
                 pass
 

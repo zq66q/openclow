@@ -327,7 +327,7 @@ class MemoryManager:
         from memory.extractor import MemoryExtractor
 
         self._extractor = MemoryExtractor(llm_client, self)
-        self._compressor = MemoryCompressor(llm_client, self, self._extractor)
+        self._compressor = MemoryCompressor(self, llm_client, self._extractor)
         logger.info(
             "auto_learning enabled",
             extra={"user_id": self.user_id},

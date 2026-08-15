@@ -115,7 +115,8 @@ class ScenarioApp:
             Agent 回答文本（错误时返回错误信息）
         """
         result = self.chat_with_details(query, session_id=session_id, image_data=image_data)
-        return result["answer"]
+        answer: str = result["answer"]
+        return answer
 
     def chat_with_details(
         self, query: str, session_id: str | None = None, image_data: str | None = None

@@ -264,7 +264,7 @@ class ContextBuilder:
         image_count = 0
         for msg in reversed(flattened):
             is_multimodal = isinstance(msg.get("content"), list) and any(
-                item.get("type") == "image_url" for item in msg.get("content", [])
+                isinstance(item, dict) and item.get("type") == "image_url" for item in msg.get("content", [])
             )
             if is_multimodal:
                 image_count += 1

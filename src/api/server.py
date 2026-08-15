@@ -78,7 +78,7 @@ def get_facade() -> Any:
         config = ServiceConfig.from_env()
         if not config.llm_api_key:
             # fallback: 尝试读取标准变量名
-            config.llm_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+            config.llm_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or ""
 
         _facade = ServiceFacade(config)
         _facade.start()
@@ -355,7 +355,7 @@ def create_app(facade: Any = None, title: str = "OpenClaw API") -> Any:
 
                 try:
                     app = svc.create_scenario(scenario)
-                    llm = getattr(app.agent, "_llm", None) or getattr(app.agent, "llm_client", None)
+                    llm: Any = getattr(app.agent, "_llm", None) or getattr(app.agent, "llm_client", None)
                     can_stream = llm is not None and hasattr(llm, "astream_chat")
 
                     if can_stream:

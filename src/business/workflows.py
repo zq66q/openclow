@@ -294,7 +294,7 @@ class Workflow:
     @staticmethod
     def restore_state(path: str) -> dict[str, Any]:
         """从 JSON 文件恢复工作流状态。"""
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        data: dict[str, Any] = json.loads(Path(path).read_text(encoding="utf-8"))
         logger.info(f"Workflow state restored from {path}: {len(data.get('completed', []))} steps completed")
         return data
 
