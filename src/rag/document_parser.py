@@ -115,8 +115,8 @@ def parse_pdf(file_path: str | Path) -> str:
         from PyPDF2 import PdfReader
 
         reader = PdfReader(str(file_path))
-        for page in reader.pages:
-            page_text = page.extract_text()
+        for pdf_page in reader.pages:
+            page_text = pdf_page.extract_text()
             if page_text:
                 text_parts.append(page_text)
         return "\n\n".join(text_parts)
