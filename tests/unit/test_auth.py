@@ -81,8 +81,10 @@ class TestAPIKeyAuth:
 
 
 class TestJWTAuth:
-    def test_enabled_without_secret(self):
-        """无密钥时 JWT 不可用。"""
+    def test_enabled_without_secret(self, monkeypatch):
+        """无密钥时 JWT 不可用（需隔离环境变量，防止本地 .env 的 secret 干扰）。"""
+        monkeypatch.delenv("OPENCLAW_JWT_SECRET", raising=False)
+        monkeypatch.setattr("auth.middleware._get_jwt_secret", lambda: None)
         auth = JWTAuth(secret="")
         assert not auth.enabled
 

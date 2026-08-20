@@ -201,36 +201,41 @@ class PlanExecuteLoop:
             "- safe_eval: 安全计算数学表达式\n"
             "- unit_convert: 单位转换\n\n"
             "## 输出格式\n"
-            "请以 JSON 数组返回计划，每个步骤包含:\n"
-            "- step: 步骤编号 (整数)\n"
+            "你必须只输出一个 JSON 数组，不要添加 markdown 代码块标记（如 ```json），"
+            "不要添加任何解释文字或前后缀。\n\n"
+            "每个步骤字段:\n"
+            "- step: 步骤编号 (整数, 从 1 开始)\n"
             "- description: 本步骤要做什么 (中文)\n"
             '- tool: 使用的工具名 (如果没有合适的工具，填 "none")\n'
-            "- input: 传给工具的输入参数\n\n"
+            "- input: 传给工具的输入参数 (字典或字符串)\n\n"
+            "## 示例输出\n"
+            '[{"step": 1, "description": "搜索当前黄金价格", "tool": "web_search", "input": {"query": "今日黄金价格 每克"}}]\n\n'
             "## 规则\n"
             "- 步骤要独立、可执行、有明确产出\n"
             "- 每个步骤只做一件事\n"
             '- 如果不需要工具，tool 填 "none"\n'
-            "- 必须在最后输出 JSON 数组，不要加其他文字\n\n"
+            "- 严禁输出 JSON 以外的任何文字\n\n"
             "## 用户问题\n"
             f"{query}\n"
         )
         if extra:
             prompt += f"\n## 额外上下文\n{extra}\n"
-        prompt += "\n## 计划 (JSON 数组)\n"
+        prompt += "\n## 计划 (纯 JSON 数组，无其他文字)\n"
         return prompt
 
     @staticmethod
     def _parse_plan(raw: str) -> list[dict[str, Any]]:
         """从 LLM 输出中提取 JSON 计划数组。"""
-        # 尝试直接解析
+        # 1. 尝试直接解析（去除常见前后缀）
+        stripped = raw.strip().lstrip("`").rstrip("`").strip()
         try:
-            parsed: Any = json.loads(raw.strip())
+            parsed: Any = json.loads(stripped)
             if isinstance(parsed, list):
                 return parsed
         except json.JSONDecodeError:
             pass
 
-        # 尝试从 markdown 代码块中提取
+        # 2. 尝试从 markdown 代码块中提取
         m = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", raw, re.DOTALL)
         if m:
             try:
@@ -240,15 +245,34 @@ class PlanExecuteLoop:
             except json.JSONDecodeError:
                 pass
 
-        # 尝试匹配整个 JSON 数组
-        m = re.search(r"\[.*?\]", raw, re.DOTALL)
-        if m:
+        # 3. 贪婪匹配：找到第一个 '[' 到最后一个 ']' 之间的内容
+        start = raw.find("[")
+        end = raw.rfind("]")
+        if start != -1 and end != -1 and end > start:
             try:
-                parsed = json.loads(m.group(0))
+                parsed = json.loads(raw[start : end + 1])
                 if isinstance(parsed, list):
                     return parsed
             except json.JSONDecodeError:
                 pass
+
+        # 4. 括号计数法：从第一个 '[' 开始，精确匹配对应的 ']'
+        start = raw.find("[")
+        if start != -1:
+            depth = 0
+            for i, ch in enumerate(raw[start:], start):
+                if ch == "[":
+                    depth += 1
+                elif ch == "]":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            parsed = json.loads(raw[start : i + 1])
+                            if isinstance(parsed, list):
+                                return parsed
+                        except json.JSONDecodeError:
+                            pass
+                        break
 
         # 兜底：返回一个"直接回答"的步骤
         logger.warning("PlanExecuteLoop: failed to parse plan JSON, fallback to single step")

@@ -194,6 +194,14 @@ class PresetAgents:
                 "3. 性能 — 不必要的计算或查询\n"
                 "4. 可维护性 — 命名、结构、注释\n"
                 "5. 规范 — 语言/框架最佳实践\n\n"
+                "工作规则（必须遵守）:\n"
+                "- 当用户消息中出现文件路径时，必须先调用 read_file 工具读取该文件，"
+                "再基于读到的真实内容进行审查\n"
+                "- 严禁凭对话历史或记忆中的代码片段代替读取文件\n"
+                "- 调用工具时必须使用规定的文本格式（Thought/Action/Action Input），"
+                "不要使用 XML 标签或 function-call 语法\n"
+                "- read_file 的 path 参数建议使用相对路径（如 src/ui/app.py），"
+                "offset/limit 控制读取范围\n\n"
                 "反馈格式: [高/中/低] 行号 — 问题描述 — 建议修改。"
             )
             tools = ["read_file"]

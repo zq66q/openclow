@@ -147,28 +147,32 @@ def render_sidebar() -> dict[str, Any]:
 
         st.markdown("---")
 
-        # 场景选择
+        # 场景选择（key 持久化，避免 rerun/热重载后重置）
         st.subheader("场景")
+        _scenario_options = [
+            "general_assistant",
+            "rag_customer_service",
+            "data_analyst",
+            "code_reviewer",
+            "multi_agent_collaboration",
+            "master_orchestrator",
+            "plan_executor",
+        ]
+        _scenario_labels = {
+            "general_assistant": "通用助手",
+            "rag_customer_service": "知识库客服",
+            "data_analyst": "数据分析师",
+            "code_reviewer": "代码审查",
+            "multi_agent_collaboration": "多 Agent 协作",
+            "master_orchestrator": "主 Agent 编排",
+            "plan_executor": "Plan-and-Execute 规划执行",
+        }
         scenario = st.selectbox(
             "选择场景",
-            [
-                "general_assistant",
-                "rag_customer_service",
-                "data_analyst",
-                "code_reviewer",
-                "multi_agent_collaboration",
-                "master_orchestrator",
-                "plan_executor",
-            ],
-            format_func=lambda x: {
-                "general_assistant": "通用助手",
-                "rag_customer_service": "知识库客服",
-                "data_analyst": "数据分析师",
-                "code_reviewer": "代码审查",
-                "multi_agent_collaboration": "多 Agent 协作",
-                "master_orchestrator": "主 Agent 编排",
-                "plan_executor": "Plan-and-Execute 规划执行",
-            }.get(x, x),
+            _scenario_options,
+            index=_scenario_options.index(st.session_state.get("_scenario", "general_assistant")),
+            key="_scenario",
+            format_func=lambda x: _scenario_labels.get(x, x),
         )
 
         # 多 Agent 协作 — 选择参与专家
@@ -246,6 +250,18 @@ def render_chat(config: dict[str, Any]) -> None:
         return
 
     st.title("对话")
+    # 显示当前场景，方便确认没有选错
+    _scenario_labels = {
+        "general_assistant": "通用助手",
+        "rag_customer_service": "知识库客服",
+        "data_analyst": "数据分析师",
+        "code_reviewer": "代码审查",
+        "multi_agent_collaboration": "多 Agent 协作",
+        "master_orchestrator": "主 Agent 编排",
+        "plan_executor": "Plan-and-Execute 规划执行",
+    }
+    _current_scenario = config.get("scenario", "general_assistant")
+    st.caption(f"当前场景: {_scenario_labels.get(_current_scenario, _current_scenario)}")
     st.markdown("---")
 
     # 历史消息

@@ -56,6 +56,8 @@ data/*
 data/vector_db/
 data/audit_logs/
 data/uploads/
+src/data/
+2026-08-17-09-51-16/
 data/knowledge_base/*.pdf
 data/knowledge_base/*.docx
 data/knowledge_base/*.xlsx

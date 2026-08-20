@@ -123,6 +123,13 @@ class ReActLoop:
                     if parsed:
                         action, action_input = parsed
 
+                # 伪标签回退：识别 <function-call name="..."> / <slack:function-call ...>
+                # 以及 <tool_call>{"name":..., "arguments":...}</tool_call> 等格式
+                if not action:
+                    parsed = ReActLoop._try_tag_parse(raw_output)
+                    if parsed:
+                        action, action_input = parsed
+
                 if action:
                     step.thought = thought.group(1).strip() if thought else ""
                     step.action = action.group(1).strip() if isinstance(action, re.Match) else action
@@ -298,6 +305,84 @@ class ReActLoop:
                         return (tool, args)
             except json.JSONDecodeError:
                 pass
+
+        return None
+
+    @staticmethod
+    def _try_tag_parse(raw_output: str) -> tuple | None:
+        """尝试解析伪标签格式的工具调用。
+
+        支持 LLM 偶尔输出的非标准格式：
+            <function-call name="read_file">
+              <parameter name="path" value="src/app.py"/>
+            </function-call>
+            <slack:function-call name="read_file">...</slack:function-call>
+            <tool_call>{"name": "read_file", "arguments": {...}}</tool_call>
+        """
+        # 1. <tool_call>{json}</tool_call> 格式
+        tc_match = re.search(
+            r"<tool_call>\s*(\{.*?\})\s*</tool_call>", raw_output, re.DOTALL
+        )
+        if tc_match:
+            try:
+                data = json.loads(tc_match.group(1))
+                tool = data.get("name") or data.get("tool") or data.get("action")
+                args = data.get("arguments") or data.get("args") or data.get("parameters", {})
+                if isinstance(tool, str):
+                    return (tool, args)
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+        # 2. <(slack:)?function-call name="xxx"> ... <parameter name="k" value="v"/> 格式
+        fc_match = re.search(
+            r"<(?:slack:)?function-call\s+name=[\"']([^\"']+)[\"']\s*>",
+            raw_output,
+        )
+        if fc_match:
+            tool = fc_match.group(1)
+            args: dict = {}
+            # 提取参数对
+            for pm in re.finditer(
+                r"<(?:slack:)?parameter\s+name=[\"']([^\"']+)[\"']\s+value=[\"']([^\"']*)[\"']\s*/?>",
+                raw_output,
+            ):
+                args[pm.group(1)] = pm.group(2)
+            # 也支持 <parameter name="k">v</parameter> 包裹形式
+            for pm in re.finditer(
+                r"<(?:slack:)?parameter\s+name=[\"']([^\"']+)[\"']\s*>(.*?)</(?:slack:)?parameter>",
+                raw_output,
+                re.DOTALL,
+            ):
+                args.setdefault(pm.group(1), pm.group(2).strip())
+            if tool:
+                return (tool, args)
+
+        # 3. <tool_calls><invoke name="xxx"><parameter name="k" string="bool">v</parameter>...</invoke></tool_calls>
+        # DeepSeek 等模型偶尔输出的 XML 工具调用格式
+        inv_match = re.search(
+            r"<tool_calls>\s*<invoke\s+name=[\"']([^\"']+)[\"']\s*>",
+            raw_output,
+            re.DOTALL,
+        )
+        if inv_match:
+            tool = inv_match.group(1)
+            args = {}
+            for pm in re.finditer(
+                r"<parameter\s+name=[\"']([^\"']+)[\"']\s+(?:string|boolean|number)=[\"'][^\"']*[\"']\s*>(.*?)</parameter>",
+                raw_output,
+                re.DOTALL,
+            ):
+                args[pm.group(1)] = pm.group(2).strip()
+            # 也支持不带 type 属性的简写形式
+            if not args:
+                for pm in re.finditer(
+                    r"<parameter\s+name=[\"']([^\"']+)[\"']\s*>(.*?)</parameter>",
+                    raw_output,
+                    re.DOTALL,
+                ):
+                    args[pm.group(1)] = pm.group(2).strip()
+            if tool:
+                return (tool, args)
 
         return None
 
