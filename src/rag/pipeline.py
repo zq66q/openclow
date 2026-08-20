@@ -150,9 +150,15 @@ class RAGPipeline:
         self,
         file_path: str | Path,
         *,
+        source: str | None = None,
         dedup: bool = True,
     ) -> dict[str, Any]:
         """入库单个文件（自动检测类型并解析）。
+
+        Args:
+            file_path: 文件路径
+            source: 来源标识（用于去重和展示）。默认使用文件名
+            dedup: 是否去重
 
         支持格式: PDF, DOCX, PPTX, XLSX, HTML, CSV, MD, TXT, 代码文件
         """
@@ -179,7 +185,7 @@ class RAGPipeline:
         return self.ingest_text(
             text,
             metadata=file_meta,
-            source=file_path.name,
+            source=source or file_path.name,
             chunker_type=chunker_type,
             dedup=dedup,
         )

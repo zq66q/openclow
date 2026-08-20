@@ -179,12 +179,17 @@ class ContextBuilder:
 
         多模态消息不再强制保留；当预算不足时，会尝试将其降级为纯文本（只保留文字部分）
         后再判断是否能放入预算，避免图片无限累积撑爆上下文。
+
+        ⚠️ 当前用户的查询消息（含图片的多模态消息）绝不能降级——降级会导致用户上传的图片丢失。
         """
         result: list[dict[str, Any]] = []
         result.append(messages[0])  # system prompt
 
         # 从后往前保留
         remaining_budget = max_tokens - ContextBuilder._estimate_tokens([messages[0]])
+        # 当前用户查询消息（messages 列表最后一个）必须保留原样，不能降级
+        # 区分"最后一条 user 消息"用 role 判断；多模态 content 都是 list
+        current_query_msg = messages[-1] if len(messages) > 1 else None
         for msg in reversed(messages[1:]):
             if remaining_budget <= 0:
                 break
@@ -194,7 +199,15 @@ class ContextBuilder:
                 remaining_budget -= msg_tokens
                 continue
 
-            # 预算不足时，如果是多模态消息，尝试降级为纯文本
+            # 预算不足时，如果是当前用户查询 → 强制保留（哪怕超出预算）
+            # 当前查询含图片被丢弃会导致 AI "看不到" 图片
+            if msg is current_query_msg:
+                # 当前用户消息：永远保留完整多模态内容，不做任何降级
+                result.insert(1, msg)
+                # 不扣 budget（已经超出），但保留这条
+                continue
+
+            # 预算不足时，如果是历史多模态消息，尝试降级为纯文本
             is_multimodal = isinstance(msg.get("content"), list) and any(
                 item.get("type") == "image_url" for item in msg.get("content", [])
             )

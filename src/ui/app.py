@@ -140,7 +140,7 @@ def render_sidebar() -> dict[str, Any]:
         )
         # 模型列表：优先 .env 中的值
         _env_model = os.getenv("LLM_MODEL", "")
-        _models = ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo", "deepseek-chat", "qwen-plus"]
+        _models = ["deepseek-chat", "qwen-plus"]
         if _env_model and _env_model not in _models:
             _models.insert(0, _env_model)
         model = st.selectbox("模型", _models, index=_models.index(_env_model) if _env_model in _models else 0)
@@ -292,28 +292,50 @@ def render_chat(config: dict[str, Any]) -> None:
 
     # 输入区
     # ── 图片上传 ──
-    image_data = None
+    _img_counter = st.session_state.get("_chat_img_counter", 0)
+    _img_key = f"chat_image_uploader_{_img_counter}"
     uploaded_image = st.file_uploader(
         "上传图片",
         type=["png", "jpg", "jpeg"],
-        key="chat_image_uploader",
+        key=_img_key,
         label_visibility="collapsed",
         help="支持 PNG/JPG 格式，最大 5MB",
     )
+    # 上传新图片时立即编码并存入 session_state，防止跨 rerun 丢失
     if uploaded_image is not None:
         import base64
 
         img_bytes = uploaded_image.getvalue()
         if len(img_bytes) > 5 * 1024 * 1024:
             st.warning("图片超过 5MB，已忽略")
+            st.session_state.pop("_chat_image_data", None)
         else:
-            # 推断 MIME 类型
             mime = "image/png" if uploaded_image.name.lower().endswith(".png") else "image/jpeg"
-            image_data = f"data:{mime};base64,{base64.b64encode(img_bytes).decode()}"
+            b64_data = f"data:{mime};base64,{base64.b64encode(img_bytes).decode()}"
+            st.session_state["_chat_image_data"] = b64_data
+            st.session_state["_chat_image_name"] = uploaded_image.name
             st.caption(f"📎 已选择图片: {uploaded_image.name} ({len(img_bytes) // 1024}KB)")
+            # 检测 vision 模型配置是否有效
+            _vision_key = os.getenv("LLM_VISION_API_KEY", "").strip()
+            _vision_model = os.getenv("LLM_VISION_MODEL", "").strip()
+            _placeholder_hint = ("你的", "密钥", "xxx", "xxxx")
+            if not _vision_key or any(h in _vision_key for h in _placeholder_hint):
+                st.warning("⚠️ 未配置有效的 vision 模型 key（LLM_VISION_API_KEY），图片识别将失败，请在 .env 中填写")
+            else:
+                st.caption(f"🖼️ 图片将由视觉模型 `{_vision_model or '?'}` 识别")
 
-    if prompt := st.chat_input("输入消息..."):
-        AppState.add_message("user", prompt)
+    # 从 session_state 读取已缓存的图片数据（跨 rerun 不会丢失）
+    image_data = st.session_state.get("_chat_image_data")
+    image_name = st.session_state.get("_chat_image_name", "")
+
+    prompt = st.chat_input("输入消息...")
+    if prompt is not None:
+        prompt = prompt or ""
+        # 把用户消息加到历史（包含图片引用）
+        display_content = prompt
+        if image_data:
+            display_content += f"\n\n📎 [图片: {image_name}]"
+        AppState.add_message("user", display_content)
 
         # 清除上次的工具调用详情（新对话开始）
         st.session_state.pop("_last_tool_steps", None)
@@ -410,18 +432,26 @@ def render_chat(config: dict[str, Any]) -> None:
             cost_data["tokens"] = cost_data.get("tokens", 0) + final_token_usage.get("total_tokens", 0)
             cost_data["cost"] = cost_data.get("cost", 0) + final_token_usage.get("total_cost", 0)
             st.session_state[AppState.KEY_COST] = cost_data
+            # 发送成功后清空图片上传器
+            st.session_state.pop("_chat_image_data", None)
+            st.session_state.pop("_chat_image_name", None)
+            st.session_state["_chat_img_counter"] = st.session_state.get("_chat_img_counter", 0) + 1
             st.rerun()
         else:
             # 非主 Agent 模式：使用 spinner
             with st.spinner("思考中..."):
                 try:
                     facade = AppState.get_facade(**config)
-                    answer = facade.chat(query=prompt, image_data=image_data)
+                    answer = facade.chat(query=prompt, scenario=config.get("scenario", "general_assistant"), image_data=image_data)
                 except Exception as exc:
                     answer = f"出错了: {exc}"
                     logger.error(f"chat error: {exc}")
 
             AppState.add_message("assistant", answer)
+            # 发送成功后清空图片上传器
+            st.session_state.pop("_chat_image_data", None)
+            st.session_state.pop("_chat_image_name", None)
+            st.session_state["_chat_img_counter"] = st.session_state.get("_chat_img_counter", 0) + 1
             st.rerun()
 
 
@@ -459,7 +489,7 @@ def render_rag_panel(config: dict[str, Any]) -> None:
                         tmp.write(uploaded_file.getvalue())  # type: ignore[union-attr]
                         tmp_path = tmp.name
                     try:
-                        result = pipeline.ingest_file(tmp_path)
+                        result = pipeline.ingest_file(tmp_path, source=uploaded_file.name)
                         if result.get("chunks", 0) == 0:
                             st.warning(f"`{uploaded_file.name}` 已处理但未生成片段")
                         else:
