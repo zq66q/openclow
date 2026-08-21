@@ -453,6 +453,30 @@ def render_chat(config: dict[str, Any]) -> None:
             st.session_state.pop("_chat_image_name", None)
             st.session_state["_chat_img_counter"] = st.session_state.get("_chat_img_counter", 0) + 1
             st.rerun()
+        # ── 多 Agent 协作模式：并行调用所选专家，由 LLM 汇总 ──
+        elif config.get("scenario") == "multi_agent_collaboration":
+            selected = config.get("selected_agents") or ["general"]
+            with st.spinner(f"🤝 {len(selected)} 个专家并行分析中..."):
+                try:
+                    facade = AppState.get_facade(**config)
+                    ma = facade.multi_agent_chat(query=prompt, agent_names=selected)
+                    answer = ma.get("final_answer", "")
+                    st.session_state["_last_multi_agent_results"] = ma.get("individual_results", {})
+                    st.session_state["_last_multi_agent_elapsed"] = ma.get("elapsed_ms", 0)
+                    st.session_state["_last_tool_calls_count"] = sum(
+                        r.get("tool_calls_count", 0) for r in ma.get("individual_results", {}).values()
+                    )
+                    st.session_state["_last_elapsed_ms"] = ma.get("elapsed_ms", 0)
+                except Exception as exc:
+                    answer = f"出错了: {exc}"
+                    logger.error(f"multi_agent_chat error: {exc}")
+
+            AppState.add_message("assistant", answer)
+            # 发送成功后清空图片上传器
+            st.session_state.pop("_chat_image_data", None)
+            st.session_state.pop("_chat_image_name", None)
+            st.session_state["_chat_img_counter"] = st.session_state.get("_chat_img_counter", 0) + 1
+            st.rerun()
         else:
             # 非主 Agent 模式：使用 spinner
             with st.spinner("思考中..."):
